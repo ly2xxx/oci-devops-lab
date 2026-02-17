@@ -1,0 +1,26 @@
+# OCI Authentication - Get these from OCI Console
+# https://cloud.oracle.com/identity/domains/my-profile
+
+tenancy_ocid     = "ocid1.tenancy.oc1..aaaaaaaxxxxxxxxx"
+user_ocid        = "ocid1.user.oc1..aaaaaaaxxxxxxxxx"
+fingerprint      = "xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx:xx"
+private_key_path = "~/.oci/oci_api_key.pem"
+region           = "uk-london-1"  # Change to your region
+
+# Compartment - Use root compartment OCID (same as tenancy_ocid for free tier)
+compartment_ocid = "ocid1.tenancy.oc1..aaaaaaaxxxxxxxxx"
+
+# SSH Key - Generate with: ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
+ssh_public_key_path = "~/.ssh/id_rsa.pub"
+
+# Availability Domain - Check OCI console for available ADs in your region
+availability_domain = 1
+
+# Image OCID - Get from OCI Console > Compute > Images
+# Or use data source in network.tf to auto-fetch latest Oracle Linux 8
+instance_image_ocid = "ocid1.image.oc1.uk-london-1.aaaaaaaxxxxxxxxx"
+
+# Instructions:
+# 1. Copy this file to terraform.tfvars
+# 2. Replace all placeholder values with your actual OCI details
+# 3. Add terraform.tfvars to .gitignore (DO NOT commit credentials!)

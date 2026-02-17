@@ -1,0 +1,98 @@
+---
+# Deploy Demo Application
+# Copies Flask app, configures Nginx, starts services
+
+- name: Deploy Demo App
+  hosts: app_servers
+  become: yes
+  
+  vars:
+    app_user: appuser
+    app_dir: /opt/demoapp
+    app_port: 5000
+    
+  tasks:
+    - name: Install Python dependencies
+      pip:
+        name:
+          - flask
+          - gunicorn
+        executable: pip3
+        
+    - name: Copy application files
+      copy:
+        src: "{{ playbook_dir }}/../../app/"
+        dest: "{{ app_dir }}/"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0644'
+        
+    - name: Make app.py executable
+      file:
+        path: "{{ app_dir }}/app.py"
+        mode: '0755'
+        
+    - name: Create systemd service for app
+      copy:
+        dest: /etc/systemd/system/demoapp.service
+        content: |
+          [Unit]
+          Description=Demo Flask Application
+          After=network.target
+
+          [Service]
+          Type=simple
+          User={{ app_user }}
+          WorkingDirectory={{ app_dir }}
+          ExecStart=/usr/local/bin/gunicorn --bind 127.0.0.1:{{ app_port }} app:app
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+        mode: '0644'
+      notify: restart demoapp
+      
+    - name: Configure Nginx
+      copy:
+        dest: /etc/nginx/conf.d/demoapp.conf
+        content: |
+          server {
+              listen 80;
+              server_name _;
+
+              location / {
+                  proxy_pass http://127.0.0.1:{{ app_port }};
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+                  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+              }
+          }
+        mode: '0644'
+      notify: restart nginx
+      
+    - name: Remove default Nginx config
+      file:
+        path: /etc/nginx/nginx.conf.default
+        state: absent
+        
+    - name: Start and enable services
+      systemd:
+        name: "{{ item }}"
+        state: started
+        enabled: yes
+        daemon_reload: yes
+      loop:
+        - demoapp
+        - nginx
+        
+  handlers:
+    - name: restart demoapp
+      systemd:
+        name: demoapp
+        state: restarted
+        daemon_reload: yes
+        
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted

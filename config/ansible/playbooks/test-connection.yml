@@ -1,0 +1,21 @@
+---
+# Simple connectivity test
+- name: Test Ansible Connection
+  hosts: all
+  gather_facts: yes
+  
+  tasks:
+    - name: Ping all hosts
+      ping:
+      
+    - name: Display hostname
+      debug:
+        msg: "Connected to {{ ansible_hostname }} ({{ ansible_distribution }} {{ ansible_distribution_version }})"
+        
+    - name: Check Python version
+      command: python3 --version
+      register: python_version
+      
+    - name: Display Python version
+      debug:
+        msg: "{{ python_version.stdout }}"

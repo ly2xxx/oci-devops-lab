@@ -1,0 +1,82 @@
+---
+# Base Configuration Playbook
+# Hardens OS, installs packages, configures firewall
+
+- name: Configure App Servers
+  hosts: app_servers
+  become: yes
+  
+  vars:
+    app_user: appuser
+    app_group: appgroup
+    
+  tasks:
+    - name: Update all packages
+      yum:
+        name: '*'
+        state: latest
+        
+    - name: Install required packages
+      yum:
+        name:
+          - nginx
+          - python3
+          - python3-pip
+          - git
+          - firewalld
+        state: present
+        
+    - name: Ensure firewalld is running
+      systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+        
+    - name: Configure firewall rules
+      firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - http
+        - https
+        - ssh
+        
+    - name: Create app user
+      user:
+        name: "{{ app_user }}"
+        group: "{{ app_group }}"
+        create_home: yes
+        shell: /bin/bash
+        state: present
+        
+    - name: Create app directory
+      file:
+        path: /opt/demoapp
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: '0755'
+        
+    - name: Harden SSH - Disable root login
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PermitRootLogin'
+        line: 'PermitRootLogin no'
+        state: present
+      notify: restart sshd
+      
+    - name: Harden SSH - Disable password authentication
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^PasswordAuthentication'
+        line: 'PasswordAuthentication no'
+        state: present
+      notify: restart sshd
+      
+  handlers:
+    - name: restart sshd
+      systemd:
+        name: sshd
+        state: restarted
