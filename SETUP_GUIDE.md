@@ -161,8 +161,8 @@ terraform init
 
 ```powershell
 # Preview what will be created
-terraform plan
-
+terraform plan -out=tfplan
+(terraform show tfplan > tfplan.txt)
 # Review the output - should show:
 # - VCN, subnets, internet gateway, route tables
 # - Security lists
@@ -173,7 +173,7 @@ terraform plan
 
 ```powershell
 # Create infrastructure
-terraform apply
+terraform apply tfplan
 
 # Type 'yes' when prompted
 # Wait ~5-10 minutes for VMs to provision

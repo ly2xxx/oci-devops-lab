@@ -5,6 +5,7 @@
 .terraform/
 .terraform.lock.hcl
 crash.log
+tfplan*
 
 # Ansible
 *.retry
