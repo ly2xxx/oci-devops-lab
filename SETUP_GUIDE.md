@@ -1,477 +1,755 @@
-# OCI DevOps Lab - Detailed Setup Guide
+# DevOps Lab Setup Guide - Vagrant Edition
 
-This guide walks you through setting up the complete lab environment step by step.
-
----
-
-## 🎯 Tonight's Goal
-
-Get VM1 and VM2 running on OCI with Terraform, then configure VM2 with Ansible to serve a demo web app.
-
-**Timeline:** 2-3 hours
+**Updated:** 2026-02-18  
+**Platform:** Vagrant + VirtualBox (Local VMs)  
+**Time to Complete:** 30-45 minutes  
+**Cost:** $0 (runs on your laptop)
 
 ---
 
-## Phase 1: OCI Prerequisites (15 minutes)
+## 📋 Why Vagrant Instead of OCI?
 
-### Step 1.1: Get OCI API Credentials
+**Performance:**
+- ✅ **2GB RAM per VM** (vs OCI's 1GB)
+- ✅ **Fast package installs** (no internet bottleneck)
+- ✅ **Instant snapshots/rollback**
+- ✅ **Full control over resources**
 
-1. **Log into OCI Console**
-   - Go to https://cloud.oracle.com/
-   - Sign in with your account
+**Learning:**
+- ✅ **Learn Terraform Vagrant provider** (still Infrastructure as Code!)
+- ✅ **Same Ansible playbooks** work locally and cloud
+- ✅ **Practice without cloud costs/limits**
+- ✅ **Faster iteration** (destroy/rebuild in minutes)
 
-2. **Get Your OCIDs**
-   Navigate to: **Profile (top right) → Tenancy: <your-tenancy-name>**
-   
-   Note down:
-   - **Tenancy OCID:** `ocid1.tenancy.oc1..aaaaaa...`
-   - **Region:** e.g., `uk-london-1`, `eu-frankfurt-1`
+**Migration Path:**
+- ✅ Master locally first → Move to OCI/AWS/Azure later
+- ✅ Ansible playbooks are cloud-agnostic
 
-3. **Get User OCID**
-   Navigate to: **Identity → Users → Your Username**
-   
-   Copy: **User OCID:** `ocid1.user.oc1..aaaaaa...`
+---
 
-4. **Generate API Key Pair**
-   
-   On your **Windows machine**, open Git Bash or PowerShell:
-   ```bash
-   # Create .oci directory
-   mkdir -p ~/.oci
-   cd ~/.oci
-   
-   # Generate key pair in PEM format (REQUIRED by OCI!)
-   ssh-keygen -t rsa -b 4096 -m PEM -f oci_api_key -N ""
-   
-   # Rename to .pem extension
-   mv oci_api_key oci_api_key.pem
-   
-   # This creates:
-   # oci_api_key.pem (private key in PEM format)
-   # oci_api_key.pub (public key)
-   ```
-   
-   **⚠️ Critical:** The `-m PEM` flag is required! OCI does NOT accept OpenSSH format keys.
-   
-   **Verify correct format:**
-   ```bash
-   head -1 ~/.oci/oci_api_key.pem
-   # Should show: -----BEGIN PRIVATE KEY-----
-   # NOT: -----BEGIN OPENSSH PRIVATE KEY-----
-   ```
+## 🎯 What You'll Build
 
-5. **Add Public Key to OCI**
-   - In OCI Console: **Identity → Users → Your Username → API Keys**
-   - Click **Add API Key**
-   - Choose **Paste Public Key**
-   - Open `~/.oci/oci_api_key.pub` (or `C:\Users\vl\.oci\oci_api_key.pub` on Windows) and paste contents
-   - Click **Add**
-   - **Copy the fingerprint** shown (you'll need this)
-   
-   **Verify PEM format:**
-   ```bash
-   # Your private key should start with:
-   head -1 ~/.oci/oci_api_key.pem
-   # Should output: -----BEGIN PRIVATE KEY-----
-   # NOT: -----BEGIN OPENSSH PRIVATE KEY-----
-   ```
+```
+Your Windows Laptop
+    ├── VM1 (Control Node) - 192.168.56.10
+    │   ├── Terraform (Vagrant provider)
+    │   ├── Ansible
+    │   └── Workspace
+    │
+    └── VM2 (App Server) - 192.168.56.11
+        ├── Nginx (reverse proxy)
+        ├── Flask Demo App
+        └── Managed by Ansible
+```
 
-### Step 1.2: Configure SSH Key for VM Access
+**Access:**
+- VM1: `vagrant ssh vm1-control`
+- VM2: `vagrant ssh vm2-app`
+- Flask App: http://localhost:5000 (from your browser)
 
+---
+
+## 📦 Prerequisites
+
+### 1. Install VirtualBox
+
+**Windows (PowerShell):**
 ```powershell
-# Generate SSH key for VM access (if you don't have one)
-cd C:\Users\vl\.ssh
-ssh-keygen -t rsa -b 4096 -f id_rsa -N ""
+winget install Oracle.VirtualBox
+```
 
-# This creates:
-# id_rsa (private key)
-# id_rsa.pub (public key for VMs)
+**Or download manually:**
+https://www.virtualbox.org/wiki/Downloads
+
+**Verify:**
+```powershell
+& "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" --version
 ```
 
 ---
 
-## Phase 2: Configure Terraform (10 minutes)
+### 2. Install Vagrant
 
-### Step 2.1: Install Terraform (if not installed)
-
+**Windows (PowerShell):**
 ```powershell
-# Using Chocolatey - (Run as administrator)
-choco install terraform -y
-
-# Verify
-terraform version
+winget install Hashicorp.Vagrant
 ```
 
-### Step 2.2: Configure Terraform Variables
+**Or download manually:**
+https://www.vagrantup.com/downloads
 
+**Verify:**
 ```powershell
-cd C:\code\oci-devops-lab\infra\terraform
-
-# Copy example file
-copy terraform.tfvars.example terraform.tfvars
-
-# Edit terraform.tfvars with your actual values
-notepad terraform.tfvars
+vagrant --version
+# Should show: Vagrant 2.4.x
 ```
-
-**Fill in your values:**
-```hcl
-tenancy_ocid     = "ocid1.tenancy.oc1..aaaaaa..."  # From Step 1.1
-user_ocid        = "ocid1.user.oc1..aaaaaa..."     # From Step 1.1
-fingerprint      = "xx:xx:xx:..."                  # From Step 1.1 (API key)
-private_key_path = "C:\\Users\\vl\\.oci\\oci_api_key"
-region           = "uk-london-1"                    # Your region
-
-compartment_ocid = "ocid1.tenancy.oc1..aaaaaa..."  # Same as tenancy_ocid
-
-ssh_public_key_path = "C:\\Users\\vl\\.ssh\\id_rsa.pub"
-
-availability_domain = 1  # Try 1, 2, or 3 based on your region
-
-# Leave image_ocid empty - Terraform will auto-fetch latest Oracle Linux 8
-instance_image_ocid = ""
-```
-
-### Step 2.3: Get Image OCID (Alternative)
-
-If auto-fetch doesn't work, manually get the image OCID:
-
-1. In OCI Console: **Compute → Images**
-2. Find **Oracle Linux 8**
-3. Click on it
-4. Copy **OCID**
-5. Paste into `terraform.tfvars`: `instance_image_ocid = "ocid1.image..."`
 
 ---
 
-## Phase 3: Deploy Infrastructure with Terraform (30 minutes)
+### 3. Enable Virtualization in BIOS
 
-### Step 3.1: Initialize Terraform
-
+**Check if enabled:**
 ```powershell
-cd C:\code\oci-devops-lab\infra\terraform
-
-# Initialize (downloads OCI provider)
-terraform init
-
-# Should see: "Terraform has been successfully initialized!"
+systeminfo | findstr /i "hyper"
 ```
 
-### Step 3.2: Plan Infrastructure
-
-```powershell
-# Preview what will be created
-terraform plan -out=tfplan
-(terraform show tfplan > tfplan.txt)
-# Review the output - should show:
-# - VCN, subnets, internet gateway, route tables
-# - Security lists
-# - 2 compute instances (VM1, VM2)
-```
-
-### Step 3.3: Apply Infrastructure
-
-```powershell
-# Create infrastructure
-terraform apply tfplan
-
-# Type 'yes' when prompted
-# Wait ~5-10 minutes for VMs to provision
-```
-
-### Step 3.4: Get Outputs
-
-```powershell
-# Show all outputs
-terraform output
-
-# Get specific values
-terraform output vm1_public_ip
-terraform output vm2_public_ip
-terraform output ssh_to_vm1
-terraform output ansible_inventory
-```
-
-**Save these IPs - you'll need them!**
+**If disabled:**
+- Reboot → Enter BIOS (F2/Del/F10)
+- Enable VT-x (Intel) or AMD-V (AMD)
+- Save and reboot
 
 ---
 
-## Phase 4: Configure VM1 (Control Node) (30 minutes)
-
-### Step 4.1: SSH to VM1
+### 4. Install Git (if not already)
 
 ```powershell
-# Get VM1 IP from Terraform output
-terraform output vm1_public_ip
-
-# SSH (replace with actual IP)
-ssh -i C:\Users\vl\.ssh\id_rsa opc@<VM1_PUBLIC_IP>
+winget install Git.Git
 ```
 
-**Troubleshooting:**
-- If connection refused: Wait 2-3 minutes for cloud-init to complete
-- Check security list allows SSH from your IP
-- Verify your public IP: `curl ifconfig.me`
+---
 
-### Step 4.2: Verify Cloud-Init Completed
+## 🚀 Phase 1: Launch VMs (10 minutes)
+
+### Step 1: Navigate to Project
+
+```powershell
+cd C:\code\oci-devops-lab
+```
+
+### Step 2: Start VMs
+
+```powershell
+# Download Oracle Linux 8 box (first time only, ~700MB)
+# Then create and provision both VMs
+vagrant up
+
+# This will:
+# - Download the base box (5-10 min, one-time)
+# - Create VM1 and VM2
+# - Install Terraform + Ansible on VM1
+# - Install basic tools on VM2
+# - Configure networking
+```
+
+**Output you'll see:**
+```
+==> vm1-control: Importing base box 'generic/oracle8'...
+==> vm1-control: Forwarding ports...
+==> vm1-control: Running provisioner: shell...
+=== Provisioning VM1 (Control Node) ===
+Installing Terraform...
+Installing Ansible...
+VM1 provisioning complete!
+Terraform: 1.7.5
+Ansible: 2.x
+
+==> vm2-app: Importing base box 'generic/oracle8'...
+==> vm2-app: Running provisioner: shell...
+=== Provisioning VM2 (App Server) ===
+VM2 provisioning complete!
+```
+
+### Step 3: Verify VMs Are Running
+
+```powershell
+# Check status
+vagrant status
+
+# Should show:
+# vm1-control    running (virtualbox)
+# vm2-app        running (virtualbox)
+```
+
+---
+
+## 🔧 Phase 2: Configure Control Node (15 minutes)
+
+### Step 1: SSH to VM1
+
+```powershell
+vagrant ssh vm1-control
+```
+
+**You're now inside VM1!**
+
+### Step 2: Verify Installations
 
 ```bash
-# On VM1
-cat /tmp/cloud-init-complete.txt
-# Should say: "VM1 Control Node initialization complete!"
-
 # Check installed tools
-terraform version
+terraform --version
 ansible --version
 git --version
+python3 --version
+
+#if not installed, run the following command:
+sudo yum install -y git wget curl vim unzip python3-pip && cd /tmp && wget -q https://releases.hashicorp.com/terraform/1.7.5/terraform_1.7.5_linux_amd64.zip && unzip -o terraform_1.7.5_linux_amd64.zip && sudo mv terraform /usr/local/bin/ && sudo chmod +x /usr/local/bin/terraform && rm terraform_1.7.5_linux_amd64.zip && sudo pip3 install --upgrade pip && sudo pip3 install ansible && mkdir -p ~/workspace && echo "✅ Setup complete!" && terraform --version && ansible --version && git --version
+
+# Check network connectivity to VM2
+ping -c 3 192.168.56.11
 ```
 
-### Step 4.3: Clone Repo to VM1
+### Step 3: Set Up Ansible Inventory
 
 ```bash
-cd ~
-git clone https://github.com/ly2xxx/oci-devops-lab.git
-cd oci-devops-lab
-```
+# Create Ansible directory structure
+mkdir -p ~/workspace/ansible/inventory
+cd ~/workspace/ansible
 
-### Step 4.4: Configure OCI Credentials on VM1
+# Create inventory file
+# Generate SSH key if not already done
+if [ ! -f ~/.ssh/id_rsa ]; then
+    ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+fi
 
-```bash
-mkdir ~/.oci
+# Copy public key to VM2
+ssh-copy-id -o StrictHostKeyChecking=no vagrant@192.168.56.11
+# Password: vagrant
 
-# Copy your OCI API key to VM1
-# On Windows machine, run:
-# scp -i C:\Users\vl\.ssh\id_rsa C:\Users\vl\.oci\oci_api_key opc@<VM1_IP>:~/.oci/
-
-# On VM1:
-chmod 600 ~/.oci/oci_api_key
-
-# Create OCI config file
-vi ~/.oci/config
-```
-
-**Paste this (replace with your values):**
-```ini
-[DEFAULT]
-user=ocid1.user.oc1..aaaaaa...
-fingerprint=xx:xx:xx:...
-key_file=/home/opc/.oci/oci_api_key
-tenancy=ocid1.tenancy.oc1..aaaaaa...
-region=uk-london-1
-```
-
-### Step 4.5: Test Terraform on VM1
-
-```bash
-cd ~/oci-devops-lab/infra/terraform
-
-# Copy terraform.tfvars from Windows
-# OR recreate it on VM1
-
-# Test
-terraform plan
-# Should show: No changes (infrastructure already exists)
-```
-
----
-
-## Phase 5: Configure Ansible Inventory (15 minutes)
-
-### Step 5.1: Update Inventory File
-
-On **VM1**:
-
-```bash
-cd ~/oci-devops-lab/config/ansible
-
-# Get Terraform outputs for IPs
-cd ~/oci-devops-lab/infra/terraform
-terraform output ansible_inventory
-
-# Copy the output to inventory file
-vi inventory/hosts.yml
-```
-
-**Replace placeholders with actual IPs:**
-```yaml
+# Update inventory to use the correct key
+cat > ~/workspace/ansible/inventory/hosts.yml << 'EOF'
 all:
-  vars:
-    ansible_user: opc
-    ansible_ssh_private_key_file: ~/.ssh/id_rsa
-    ansible_python_interpreter: /usr/bin/python3
-
   children:
     control:
       hosts:
         vm1:
-          ansible_host: <VM1_PUBLIC_IP>
-          
+          ansible_host: 192.168.56.10
+          ansible_connection: local
+    
     app_servers:
       hosts:
         vm2:
-          ansible_host: <VM2_PRIVATE_IP>
+          ansible_host: 192.168.56.11
+          ansible_user: vagrant
+          ansible_ssh_private_key_file: ~/.ssh/id_rsa
+          ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
+EOF
+
+# Create ansible.cfg
+cat > ansible.cfg << 'EOF'
+[defaults]
+inventory = inventory/hosts.yml
+host_key_checking = False
+retry_files_enabled = False
+stdout_callback = yaml
+
+[privilege_escalation]
+become = True
+become_method = sudo
+become_user = root
+become_ask_pass = False
+EOF
 ```
 
-### Step 5.2: Test Ansible Connection
+### Step 4: Test Ansible Connectivity
 
 ```bash
-cd ~/oci-devops-lab/config/ansible
+# Ping all hosts
+ansible all -m ping
 
-# Test ping
-ansible all -i inventory/hosts.yml -m ping
-
-# Should get:
-# vm1 | SUCCESS => ...
-# vm2 | SUCCESS => ...
+# Expected output:
+# vm1 | SUCCESS => {
+#     "changed": false,
+#     "ping": "pong"
+# }
+# vm2 | SUCCESS => {
+#     "changed": false,
+#     "ping": "pong"
+# }
 ```
 
-**Troubleshooting:**
-- If VM2 unreachable from VM1:
-  - Check security list allows SSH from VCN CIDR (10.0.0.0/16)
-  - Verify VM2's private IP
-  - Test: `ssh opc@<VM2_PRIVATE_IP>` from VM1
+**If VM2 fails:**
+```bash
+# Add Vagrant's SSH key to known hosts manually
+ssh-keyscan -H 192.168.56.11 >> ~/.ssh/known_hosts
+
+# Or SSH once manually to accept key
+ssh -i ~/.vagrant.d/insecure_private_key vagrant@192.168.56.11
+# Password: vagrant (if prompted)
+# Type 'exit' to return to VM1
+```
 
 ---
 
-## Phase 6: Deploy App with Ansible (30 minutes)
+## 📝 Phase 3: Create Ansible Playbooks (10 minutes)
 
-### Step 6.1: Run Base Configuration Playbook
-
-```bash
-cd ~/oci-devops-lab/config/ansible
-
-# Configure VM2 (install Nginx, create users, harden SSH)
-ansible-playbook -i inventory/hosts.yml playbooks/base-config.yml
-
-# Should complete without errors
-```
-
-### Step 6.2: Deploy Demo App
+### Playbook 1: Base Configuration
 
 ```bash
-# Deploy Flask app to VM2
-ansible-playbook -i inventory/hosts.yml playbooks/deploy-app.yml
+cd ~/workspace/ansible
 
-# Should complete successfully
+# Create playbooks directory
+mkdir -p playbooks
+
+# Create base config playbook
+cat > playbooks/base-config.yml << 'EOF'
+---
+- name: Configure base system on all hosts
+  hosts: all
+  become: yes
+  
+  tasks:
+      # Skip system update - too resource intensive for 2GB VMs
+    #- name: Ensure system packages are up to date
+    #  yum:
+    #    name: '*'
+    #    state: latest
+    #    update_cache: yes
+    
+    - name: Install essential packages
+      yum:
+        name:
+          - vim
+          - git
+          - wget
+          - curl
+          - net-tools
+         # - htop
+        state: present
+    
+    - name: Set timezone to Europe/London
+      timezone:
+        name: Europe/London
+    
+    - name: Ensure firewalld is running
+      systemd:
+        name: firewalld
+        state: started
+        enabled: yes
+    
+    - name: Configure SSH to allow key-based auth
+      lineinfile:
+        path: /etc/ssh/sshd_config
+        regexp: '^#?PubkeyAuthentication'
+        line: 'PubkeyAuthentication yes'
+      notify: restart sshd
+  
+  handlers:
+    - name: restart sshd
+      systemd:
+        name: sshd
+        state: restarted
+EOF
 ```
 
-### Step 6.3: Verify App is Running
+### Playbook 2: Deploy Flask App
 
-**From VM1:**
 ```bash
-# Check if app is running on VM2
-curl http://<VM2_PRIVATE_IP>
-
-# Should return HTML
+cat > playbooks/deploy-app.yml << 'EOF'
+---
+- name: Deploy Flask demo app on VM2
+  hosts: app_servers
+  become: yes
+  
+  vars:
+    app_dir: /opt/flask-app
+    app_user: flask
+  
+  tasks:
+    - name: Install Python and dependencies
+      yum:
+        name:
+          - python3
+          - python3-pip
+          - nginx
+        state: present
+    
+    - name: Create app user
+      user:
+        name: "{{ app_user }}"
+        system: yes
+        shell: /bin/bash
+        home: "{{ app_dir }}"
+        createhome: yes
+    
+    - name: Create app directory
+      file:
+        path: "{{ app_dir }}"
+        state: directory
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0755'
+    
+    - name: Copy Flask app code
+      copy:
+        content: |
+          from flask import Flask
+          import socket
+          
+          app = Flask(__name__)
+          
+          @app.route('/')
+          def home():
+              hostname = socket.gethostname()
+              return f"""
+              <html>
+                <head><title>DevOps Lab Demo</title></head>
+                <body style="font-family: Arial; padding: 50px; background: #f0f0f0;">
+                  <h1 style="color: #333;">🚀 DevOps Lab - Flask Demo</h1>
+                  <p><strong>Hostname:</strong> {hostname}</p>
+                  <p><strong>Server IP:</strong> 192.168.56.11</p>
+                  <p><strong>Deployed with:</strong> Vagrant + Ansible</p>
+                  <hr>
+                  <p>✅ VM provisioning: Vagrant</p>
+                  <p>✅ Configuration: Ansible</p>
+                  <p>✅ Deployment: Octopus (coming soon)</p>
+                </body>
+              </html>
+              """
+          
+          if __name__ == '__main__':
+              app.run(host='0.0.0.0', port=5000)
+        dest: "{{ app_dir }}/app.py"
+        owner: "{{ app_user }}"
+        group: "{{ app_user }}"
+        mode: '0644'
+    
+    - name: Install Flask
+      pip:
+        name: flask
+        executable: pip3
+    
+    - name: Create systemd service for Flask app
+      copy:
+        content: |
+          [Unit]
+          Description=Flask Demo App
+          After=network.target
+          
+          [Service]
+          User={{ app_user }}
+          WorkingDirectory={{ app_dir }}
+          ExecStart=/usr/bin/python3 {{ app_dir }}/app.py
+          Restart=always
+          
+          [Install]
+          WantedBy=multi-user.target
+        dest: /etc/systemd/system/flask-app.service
+        mode: '0644'
+    
+    - name: Reload systemd
+      systemd:
+        daemon_reload: yes
+    
+    - name: Start Flask app service
+      systemd:
+        name: flask-app
+        state: started
+        enabled: yes
+    
+    - name: Configure Nginx as reverse proxy
+      copy:
+        content: |
+          server {
+              listen 80;
+              server_name _;
+              
+              location / {
+                  proxy_pass http://127.0.0.1:5000;
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Real-IP $remote_addr;
+              }
+          }
+        dest: /etc/nginx/conf.d/flask-app.conf
+        mode: '0644'
+      notify: restart nginx
+    
+    - name: Remove default Nginx config
+      file:
+        path: /etc/nginx/conf.d/default.conf
+        state: absent
+    
+    - name: Configure firewall for HTTP
+      firewalld:
+        service: "{{ item }}"
+        permanent: yes
+        state: enabled
+        immediate: yes
+      loop:
+        - http
+        - https
+    
+    - name: Start and enable Nginx
+      systemd:
+        name: nginx
+        state: started
+        enabled: yes
+  
+  handlers:
+    - name: restart nginx
+      systemd:
+        name: nginx
+        state: restarted
+EOF
 ```
-
-**From your browser:**
-- Go to: `http://<VM2_PUBLIC_IP>`
-- Should see: **OCI DevOps Lab** demo page
 
 ---
 
-## Phase 7: Octopus Deploy Setup (Tomorrow)
+## ▶️ Phase 4: Run Playbooks (5 minutes)
 
-### Step 7.1: Sign Up for Octopus Cloud
-
-1. Go to https://octopus.com/start
-2. Create free cloud instance
-3. Choose a unique instance name (e.g., `yangdevops`)
-4. Your instance URL: `https://yangdevops.octopus.app`
-
-### Step 7.2: Install Tentacle on VMs
-
-**On VM1 and VM2:**
+### Run Base Configuration
 
 ```bash
-# Download Tentacle
-cd /tmp
-wget https://octopus.com/downloads/latest/Linux_x64TarGz/OctopusTentacle
-tar xzf OctopusTentacle -C /opt
+cd ~/workspace/ansible
 
-# Install
-sudo /opt/tentacle/configure
-# Follow wizard to register with Octopus Cloud
+# Apply base config to all VMs
+ansible-playbook playbooks/base-config.yml
+
+# Expected output:
+# PLAY RECAP
+# vm1    : ok=X    changed=X
+# vm2    : ok=X    changed=X
 ```
 
-### Step 7.3: Create Octopus Project
+### Deploy Flask App
 
-In Octopus Cloud:
-1. **Projects → Add Project:** "OCI DevOps Lab"
-2. **Infrastructure → Environments:**
-   - Add: `Dev` environment
-3. **Infrastructure → Deployment Targets:**
-   - Add VM2 as target (role: `app-server`)
+```bash
+# Deploy app to VM2
+ansible-playbook playbooks/deploy-app.yml
 
-### Step 7.4: Define Deployment Process
-
-**Step 1: Run Terraform**
-- Target: VM1 (control node)
-- Script:
-  ```bash
-  cd ~/oci-devops-lab/infra/terraform
-  terraform apply -auto-approve
-  ```
-
-**Step 2: Configure Servers**
-- Target: VM1
-- Script:
-  ```bash
-  cd ~/oci-devops-lab/config/ansible
-  ansible-playbook -i inventory/hosts.yml playbooks/base-config.yml
-  ```
-
-**Step 3: Deploy App**
-- Target: VM1
-- Script:
-  ```bash
-  cd ~/oci-devops-lab/config/ansible
-  ansible-playbook -i inventory/hosts.yml playbooks/deploy-app.yml
-  ```
-
-### Step 7.5: Test Deployment
-
-1. Create Release in Octopus
-2. Deploy to Dev
-3. Verify app updated on VM2
+# Expected output:
+# PLAY RECAP
+# vm2    : ok=X    changed=X
+```
 
 ---
 
-## 🎉 Success Checklist
+## 🌐 Phase 5: Test the Application
 
-- [ ] Terraform provisions VCN, VM1, VM2 on OCI
-- [ ] Can SSH to VM1 from Windows
-- [ ] VM1 has Terraform + Ansible installed
-- [ ] Ansible can connect to VM2 from VM1
-- [ ] Base config playbook runs successfully
-- [ ] Demo app deployed and accessible via browser
-- [ ] Octopus Tentacle registered (tomorrow)
-- [ ] End-to-end deployment works via Octopus (tomorrow)
+### From VM1 (inside vagrant ssh):
 
----
+```bash
+# Test Flask app directly
+curl http://192.168.56.11:5000
 
-## 📞 Need Help?
+# Test via Nginx
+curl http://192.168.56.11
+```
 
-**Common Issues:**
+### From Your Windows Browser:
 
-1. **Terraform "Authentication failed"**
-   - Verify fingerprint matches OCI console
-   - Check key file permissions: `chmod 600 ~/.oci/oci_api_key`
+**Open:** http://localhost:5000
 
-2. **VM won't start**
-   - Check Always Free capacity in your region
-   - Try different availability domain (1, 2, or 3)
+You should see:
+```
+🚀 DevOps Lab - Flask Demo
+Hostname: vm2-app
+Server IP: 192.168.56.11
+Deployed with: Vagrant + Ansible
 
-3. **Ansible can't connect**
-   - Verify security list allows SSH from VCN
-   - Check inventory has correct IPs
-
-4. **App not accessible**
-   - Check VM2 firewall: `sudo firewall-cmd --list-all`
-   - Verify Nginx is running: `sudo systemctl status nginx`
-   - Check app service: `sudo systemctl status demoapp`
+✅ VM provisioning: Vagrant
+✅ Configuration: Ansible
+✅ Deployment: Octopus (coming soon)
+```
 
 ---
 
-**Next:** Continue to Octopus Deploy integration or add VM3!
+## 🎓 What You've Accomplished
+
+- ✅ **Infrastructure as Code:** Vagrantfile defines VM resources
+- ✅ **Configuration Management:** Ansible playbooks configure VMs
+- ✅ **Application Deployment:** Flask app deployed automatically
+- ✅ **Service Management:** Systemd services, Nginx reverse proxy
+- ✅ **Networking:** Private network, port forwarding
+
+---
+
+## 🔧 Common Commands
+
+### Vagrant Management
+
+```powershell
+# On your Windows machine (C:\code\oci-devops-lab)
+
+# Start VMs
+vagrant up
+
+# Stop VMs (saves state)
+vagrant halt
+
+# Restart VMs
+vagrant reload
+
+# Destroy VMs (complete cleanup)
+vagrant destroy -f
+
+# SSH to VMs
+vagrant ssh vm1-control
+vagrant ssh vm2-app
+
+# Check VM status
+vagrant status
+
+# View VM info
+vagrant ssh-config
+```
+
+### Ansible (from VM1)
+
+```bash
+# Inside VM1
+
+# Ping all hosts
+ansible all -m ping
+
+# Run ad-hoc command
+ansible app_servers -m shell -a "uptime"
+
+# Run playbook
+ansible-playbook playbooks/deploy-app.yml
+
+# Run playbook (check mode, no changes)
+ansible-playbook playbooks/deploy-app.yml --check
+
+# Run playbook (verbose)
+ansible-playbook playbooks/deploy-app.yml -vvv
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### VM Won't Start
+
+```powershell
+# Check VirtualBox GUI
+& "C:\Program Files\Oracle\VirtualBox\VirtualBox.exe"
+
+# Check logs
+vagrant up --debug
+
+# Try reloading
+vagrant reload
+```
+
+### Ansible Can't Connect to VM2
+
+```bash
+# From VM1
+
+# Test SSH manually
+ssh -i ~/.vagrant.d/insecure_private_key vagrant@192.168.56.11
+
+# Check if VM2 is up
+ping -c 3 192.168.56.11
+
+# Re-run inventory test
+ansible all -m ping -vvv
+```
+
+### Can't Access Flask App
+
+```bash
+# From VM1
+
+# Check Flask service status
+ansible app_servers -m shell -a "systemctl status flask-app"
+
+# Check Nginx status
+ansible app_servers -m shell -a "systemctl status nginx"
+
+# Check firewall
+ansible app_servers -m shell -a "firewall-cmd --list-services"
+
+# Test locally on VM2
+vagrant ssh vm2-app
+curl http://localhost:5000
+```
+
+### Port 5000 Already in Use on Windows
+
+```powershell
+# Find what's using port 5000
+netstat -ano | findstr :5000
+
+# Kill the process (if safe)
+Stop-Process -Id <PID> -Force
+
+# Or change port in Vagrantfile:
+# vm2.vm.network "forwarded_port", guest: 5000, host: 5001
+```
+
+---
+
+## 📚 Next Steps
+
+### Phase 6: Octopus Deploy Integration
+
+1. Sign up for Octopus Cloud (free trial)
+2. Install Tentacle on VMs
+3. Create deployment project
+4. Automate Flask app deployment via Octopus
+
+### Phase 7: Terraform with Vagrant Provider
+
+Learn to provision Vagrant VMs with Terraform:
+
+```hcl
+# main.tf
+terraform {
+  required_providers {
+    vagrant = {
+      source = "bmatcuk/vagrant"
+      version = "~> 4.0"
+    }
+  }
+}
+
+resource "vagrant_vm" "vm1" {
+  name = "vm1-control"
+  # ... configuration
+}
+```
+
+### Phase 8: Migrate to Cloud
+
+Once comfortable locally:
+- Use same Ansible playbooks on OCI/AWS/Azure
+- Update inventory with cloud IPs
+- Practice cloud-specific features (load balancers, auto-scaling)
+
+---
+
+## 💡 Pro Tips
+
+**Snapshot VMs:**
+```bash
+# Take snapshot before risky changes
+VBoxManage snapshot <vm-name> take "before-change"
+
+# Restore if needed
+VBoxManage snapshot <vm-name> restore "before-change"
+```
+
+**Faster Rebuilds:**
+```powershell
+# Destroy and recreate in one command
+vagrant destroy -f && vagrant up
+```
+
+**Synced Folders:**
+Uncomment in Vagrantfile to share code:
+```ruby
+config.vm.synced_folder ".", "/vagrant"
+```
+
+Then your Windows files appear at `/vagrant` in VMs!
+
+---
+
+## 📞 Support
+
+**Issues?**
+- Check `archive/` folder for OCI-specific docs
+- Vagrant docs: https://www.vagrantup.com/docs
+- Ansible docs: https://docs.ansible.com
+- VirtualBox manual: https://www.virtualbox.org/manual
+
+---
+
+**Ready to learn DevOps the fast way!** 🚀
+
+Start with:
+```powershell
+cd C:\code\oci-devops-lab
+vagrant up
+```

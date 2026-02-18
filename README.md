@@ -1,365 +1,378 @@
-# OCI DevOps Lab - Terraform + Ansible + Octopus
+# DevOps Lab - Terraform + Ansible + Octopus Deploy
 
-**Goal:** Build a complete DevOps pipeline using Terraform, Ansible, and Octopus Deploy on Oracle Cloud Infrastructure (OCI) Always Free tier.
+**Platform:** Vagrant + VirtualBox (Local VMs)  
+**Updated:** 2026-02-18  
+**Learning Focus:** Infrastructure as Code, Configuration Management, Deployment Automation
+
+---
+
+## 🎯 What This Project Teaches
+
+Learn production DevOps practices using local VMs (fast, free, no cloud account needed):
+
+1. **Infrastructure as Code** - Vagrant + Terraform
+2. **Configuration Management** - Ansible playbooks
+3. **Deployment Automation** - Octopus Deploy
+4. **Real-World Architecture** - Multi-VM setup with control node pattern
+
+---
+
+## 🚀 Quick Start (30 minutes)
+
+### Prerequisites
+
+```powershell
+# Install VirtualBox
+winget install Oracle.VirtualBox
+
+# Install Vagrant
+winget install Hashicorp.Vagrant
+
+# Install Git
+winget install Git.Git
+```
+
+### Launch Lab Environment
+
+```powershell
+# Clone repo
+cd C:\code
+git clone https://github.com/YOUR_USERNAME/oci-devops-lab.git
+cd oci-devops-lab
+
+# Start VMs (downloads Oracle Linux 8 first time, ~700MB)
+vagrant up
+
+# Wait 10-15 minutes for provisioning
+
+# SSH to control node
+vagrant ssh vm1-control
+
+# Inside VM1, verify installations
+terraform --version  # Should show 1.7.5
+ansible --version    # Should show 2.x
+ping -c 3 192.168.56.11  # Test connectivity to VM2
+```
+
+---
+
+## 📚 Documentation
+
+| Document | Purpose |
+|----------|---------|
+| **[SETUP_GUIDE.md](SETUP_GUIDE.md)** | Complete step-by-step setup (45 min) |
+| **[PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)** | Architecture overview and roadmap |
+| **[Vagrantfile](Vagrantfile)** | VM configuration (2x Oracle Linux 8) |
+| **[archive/](archive/)** | Original OCI cloud setup (deprecated) |
 
 ---
 
 ## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│          Oracle Cloud Infrastructure            │
-│                                                 │
-│  ┌──────────────┐         ┌──────────────┐    │
-│  │   VM1        │         │   VM2        │    │
-│  │ Control Node │────────▶│  App Server  │    │
-│  │              │  SSH    │              │    │
-│  │ • Terraform  │ Ansible │ • Nginx      │    │
-│  │ • Ansible    │         │ • Demo App   │    │
-│  │ • Git        │         │              │    │
-│  │ • Octopus    │         │ • Octopus    │    │
-│  │   Tentacle   │         │   Tentacle   │    │
-│  └──────────────┘         └──────────────┘    │
-│         │                                       │
-│         │ (Optional VM3: DB/App)               │
-│         └─────────────────────────────         │
-└─────────────────────────────────────────────────┘
-         ▲                    ▲
-         │                    │
-    ┌────┴────┐         ┌─────┴──────┐
-    │ GitHub  │         │  Octopus   │
-    │  Repo   │         │   Cloud    │
-    └─────────┘         └────────────┘
+┌─────────────────────────────────────────┐
+│     Your Windows Laptop                 │
+│                                          │
+│  ┌────────────────────────────────────┐ │
+│  │  VM1 - Control Node                │ │
+│  │  IP: 192.168.56.10                 │ │
+│  │  RAM: 2GB, CPU: 2 cores            │ │
+│  │  ────────────────────────────      │ │
+│  │  • Terraform (Vagrant provider)    │ │
+│  │  • Ansible                         │ │
+│  │  • Git, Python3                    │ │
+│  │  • Workspace: ~/workspace          │ │
+│  └────────────────────────────────────┘ │
+│                    │                     │
+│                    │ Ansible over SSH    │
+│                    ▼                     │
+│  ┌────────────────────────────────────┐ │
+│  │  VM2 - App Server                  │ │
+│  │  IP: 192.168.56.11                 │ │
+│  │  RAM: 2GB, CPU: 2 cores            │ │
+│  │  ────────────────────────────      │ │
+│  │  • Nginx (reverse proxy)           │ │
+│  │  • Flask Demo App                  │ │
+│  │  • Python3, Systemd services       │ │
+│  │  • Managed by Ansible from VM1     │ │
+│  └────────────────────────────────────┘ │
+│                    │                     │
+└────────────────────┼─────────────────────┘
+                     │ Port Forwarding
+                     ▼
+            Your Browser: http://localhost:5000
 ```
 
 ---
 
-## 📋 Phase-by-Phase Implementation
+## 📋 Learning Phases
 
-### **Phase 1: OCI Setup & Terraform Foundation** (Tonight)
-**Time:** 1-2 hours
-https://signup.oraclecloud.com/ 
-1. **OCI Account Prep**
-   - [ ] Log into OCI Console
-   - [ ] Note down: Tenancy OCID, User OCID, Region
-   - [ ] Create API key pair for Terraform authentication
-   - [ ] Add public key to OCI user settings
-   - [ ] Save private key as `~/.oci/oci_api_key.pem`
+### ✅ Phase 1: Infrastructure Provisioning (DONE)
+- [x] Vagrantfile defines 2 VMs
+- [x] VirtualBox provider configuration
+- [x] Automated OS provisioning
+- [x] Network setup (private network)
 
-2. **Local Terraform Setup**
-   - [ ] Install Terraform CLI (if not already installed)
-   - [ ] Test: `terraform version`
-   - [ ] Configure OCI provider credentials in `terraform.tfvars`
+### ✅ Phase 2: Configuration Management (DONE)
+- [x] Ansible inventory setup
+- [x] Base configuration playbook
+- [x] Flask app deployment playbook
+- [x] Nginx reverse proxy setup
 
-3. **Create Networking Infrastructure**
-   - [ ] Initialize Terraform: `cd infra/terraform && terraform init`
-   - [ ] Review plan: `terraform plan`
-   - [ ] Apply: `terraform apply`
-   - [ ] Creates: VCN, subnets, internet gateway, route tables, security lists
+### 🔄 Phase 3: Octopus Deploy Integration (IN PROGRESS)
+- [ ] Sign up for Octopus Cloud
+- [ ] Install Tentacles on VMs
+- [ ] Create deployment project
+- [ ] Automate Flask deployment
 
-4. **Create VM1 (Control Node)**
-   - [ ] Provision Oracle Linux Always Free VM
-   - [ ] Assign public IP
-   - [ ] Configure security list for SSH (port 22)
-   - [ ] Get public IP from Terraform output
-   - [ ] SSH test: `ssh -i ~/.ssh/id_rsa opc@<VM1_PUBLIC_IP>`
+### 📋 Phase 4: Advanced Terraform (PLANNED)
+- [ ] Terraform Vagrant provider
+- [ ] Infrastructure modules
+- [ ] State management
+- [ ] Variable-driven deployments
 
-**Deliverable:** VM1 running and accessible via SSH
-
----
-
-### **Phase 2: Control Node Configuration** (Tonight)
-**Time:** 30-45 minutes
-
-1. **SSH into VM1**
-   ```bash
-   ssh -i ~/.ssh/id_rsa opc@<VM1_PUBLIC_IP>
-   ```
-
-2. **Install Base Tools**
-   ```bash
-   sudo yum update -y
-   sudo yum install -y git python3 python3-pip
-   ```
-
-3. **Install Terraform on VM1**
-   ```bash
-   wget https://releases.hashicorp.com/terraform/1.7.0/terraform_1.7.0_linux_amd64.zip
-   sudo unzip terraform_1.7.0_linux_amd64.zip -d /usr/local/bin/
-   terraform version
-   ```
-
-4. **Install Ansible**
-   ```bash
-   sudo pip3 install ansible
-   ansible --version
-   ```
-
-5. **Clone This Repo to VM1**
-   ```bash
-   cd ~
-   git clone https://github.com/ly2xxx/oci-devops-lab.git
-   cd oci-devops-lab
-   ```
-
-6. **Configure OCI Credentials on VM1**
-   ```bash
-   mkdir ~/.oci
-   # Upload your OCI API key and config
-   # Test: cd infra/terraform && terraform plan
-   ```
-
-**Deliverable:** VM1 is ready to run Terraform and Ansible
+### 📋 Phase 5: CI/CD Pipeline (PLANNED)
+- [ ] GitHub Actions workflow
+- [ ] Automated testing
+- [ ] Blue-green deployments
+- [ ] Rollback procedures
 
 ---
 
-### **Phase 3: Deploy VM2 (App Server)** (Tonight)
-**Time:** 30 minutes
+## 🛠️ Common Tasks
 
-1. **Add VM2 to Terraform Config**
-   - [ ] Edit `infra/terraform/compute.tf`
-   - [ ] Add VM2 definition (Always Free shape)
-   - [ ] Configure security list for HTTP (80), HTTPS (443)
+### VM Management
 
-2. **Apply Terraform from VM1**
-   ```bash
-   cd ~/oci-devops-lab/infra/terraform
-   terraform plan
-   terraform apply
-   ```
+```powershell
+# Start VMs
+vagrant up
 
-3. **Verify VM2**
-   - [ ] Check Terraform outputs for VM2 IP
-   - [ ] SSH test from VM1: `ssh opc@<VM2_PRIVATE_IP>`
-   - [ ] Update Ansible inventory with VM2 IP
+# Stop VMs (preserves state)
+vagrant halt
 
-**Deliverable:** VM2 provisioned and accessible from VM1
+# Restart VMs
+vagrant reload
 
----
+# Destroy VMs (clean slate)
+vagrant destroy -f
 
-### **Phase 4: Ansible Configuration** (Tonight/Tomorrow)
-**Time:** 1 hour
+# SSH to VMs
+vagrant ssh vm1-control
+vagrant ssh vm2-app
 
-1. **Create Ansible Inventory**
-   - [ ] Edit `config/ansible/inventory/hosts.yml`
-   - [ ] Add VM2 IP and SSH details
-
-2. **Test Ansible Connection**
-   ```bash
-   cd ~/oci-devops-lab/config/ansible
-   ansible all -i inventory/hosts.yml -m ping
-   ```
-
-3. **Run Base Configuration Playbook**
-   ```bash
-   ansible-playbook -i inventory/hosts.yml playbooks/base-config.yml
-   ```
-   - Installs: Nginx, Python, firewall rules
-   - Hardens SSH
-   - Creates app user
-
-4. **Deploy Demo App**
-   ```bash
-   ansible-playbook -i inventory/hosts.yml playbooks/deploy-app.yml
-   ```
-   - Copies Flask/Node app to VM2
-   - Configures Nginx reverse proxy
-   - Starts app service
-
-5. **Verify App**
-   - [ ] Open browser: `http://<VM2_PUBLIC_IP>`
-   - [ ] Should see demo app homepage
-
-**Deliverable:** VM2 fully configured with running web app
-
----
-
-### **Phase 5: Octopus Deploy Integration** (Tomorrow)
-**Time:** 1-2 hours
-
-1. **Sign Up for Octopus Cloud**
-   - [ ] Go to https://octopus.com/start
-   - [ ] Create free cloud instance
-   - [ ] Note: Instance URL and API key
-
-2. **Install Octopus Tentacle on VM1 & VM2**
-   ```bash
-   # On each VM:
-   wget https://octopus.com/downloads/latest/Linux_x64TarGz/OctopusTentacle
-   # Follow installation steps
-   # Register with Octopus Cloud
-   ```
-
-3. **Configure Octopus Project**
-   - [ ] Create Project: "OCI DevOps Lab"
-   - [ ] Add Environments: Dev, Test
-   - [ ] Register VM2 as deployment target (Dev environment)
-   - [ ] (Optional) Register VM3 as Test environment
-
-4. **Create Deployment Process**
-   - **Step 1:** Run Terraform (on VM1)
-     - Executes: `cd ~/oci-devops-lab/infra/terraform && terraform apply -auto-approve`
-   - **Step 2:** Run Ansible Base Config (on VM1)
-     - Executes: `ansible-playbook -i inventory playbooks/base-config.yml`
-   - **Step 3:** Deploy App (on VM1)
-     - Executes: `ansible-playbook -i inventory playbooks/deploy-app.yml`
-
-5. **Test Deployment**
-   - [ ] Create release in Octopus
-   - [ ] Deploy to Dev
-   - [ ] Verify app is updated
-   - [ ] Practice rollback
-
-**Deliverable:** End-to-end automated deployment via Octopus
-
----
-
-### **Phase 6: CI/CD Integration** (Optional - Tomorrow)
-**Time:** 1 hour
-
-1. **Set Up GitHub Actions**
-   - [ ] Create `.github/workflows/ci.yml`
-   - [ ] On push to `main`: package app, create Octopus release
-   - [ ] Auto-deploy to Dev environment
-
-2. **Test Full Pipeline**
-   - [ ] Make change to app code
-   - [ ] Push to GitHub
-   - [ ] GitHub Action triggers
-   - [ ] Octopus auto-deploys
-   - [ ] Verify change on VM2
-
-**Deliverable:** Fully automated CI/CD pipeline
-
----
-
-## 📁 Repository Structure
-
-```
-oci-devops-lab/
-├── README.md                    # This file
-├── SETUP_GUIDE.md              # Detailed setup instructions
-├── infra/
-│   └── terraform/
-│       ├── provider.tf         # OCI provider config
-│       ├── network.tf          # VCN, subnets, gateways
-│       ├── compute.tf          # VM1, VM2, VM3 definitions
-│       ├── outputs.tf          # VM IPs and resource IDs
-│       ├── variables.tf        # Input variables
-│       └── terraform.tfvars    # Your specific values (gitignored)
-├── config/
-│   └── ansible/
-│       ├── inventory/
-│       │   └── hosts.yml       # VM inventory
-│       ├── playbooks/
-│       │   ├── base-config.yml # OS hardening, packages
-│       │   └── deploy-app.yml  # App deployment
-│       └── roles/
-│           ├── common/         # Base system config
-│           ├── nginx/          # Web server setup
-│           └── app/            # Application deployment
-├── app/
-│   ├── app.py                  # Demo Flask app
-│   ├── requirements.txt        # Python dependencies
-│   └── static/
-│       └── index.html          # Simple homepage
-├── .octopus/
-│   └── deployment-process.md   # Octopus deployment steps
-└── .github/
-    └── workflows/
-        └── ci.yml              # GitHub Actions workflow
+# Check status
+vagrant status
 ```
 
----
-
-## 🎯 Success Criteria
-
-- [x] **Phase 1:** Can provision OCI network + VM1 with Terraform
-- [ ] **Phase 2:** VM1 has Terraform, Ansible, Git installed
-- [ ] **Phase 3:** Can provision VM2 from VM1 using Terraform
-- [ ] **Phase 4:** Can configure VM2 with Ansible and deploy app
-- [ ] **Phase 5:** Octopus can orchestrate full deployment
-- [ ] **Phase 6:** GitHub push triggers automated deployment
-
----
-
-## 🚀 Quick Start (Tonight)
+### Ansible (from VM1)
 
 ```bash
-# 1. Clone this repo on your Windows machine
-cd C:\code
-git clone https://github.com/ly2xxx/oci-devops-lab.git
-cd oci-devops-lab
+# SSH to VM1 first
+vagrant ssh vm1-control
 
-# 2. Configure OCI credentials
-# Edit infra/terraform/terraform.tfvars with your OCI details
+# Test connectivity
+ansible all -m ping
 
-# 3. Initialize Terraform
-cd infra\terraform
-terraform init
-terraform plan
+# Run base configuration
+cd ~/workspace/ansible
+ansible-playbook playbooks/base-config.yml
 
-# 4. Create infrastructure
-terraform apply
+# Deploy Flask app
+ansible-playbook playbooks/deploy-app.yml
 
-# 5. SSH to VM1
-ssh -i C:\Users\vl\.ssh\id_rsa opc@<VM1_PUBLIC_IP>
+# Ad-hoc commands
+ansible app_servers -m shell -a "systemctl status flask-app"
+```
 
-# 6. Continue with Phase 2 steps on VM1
+### Access Flask App
+
+**From your browser:** http://localhost:5000
+
+**From VM1 SSH:**
+```bash
+curl http://192.168.56.11
 ```
 
 ---
 
-## 📚 Prerequisites
+## 🎓 What You Learn
 
-### Software Needed
-- [x] Terraform CLI (install: `choco install terraform`)
-- [x] Git
-- [ ] OCI CLI (optional but helpful)
-- [ ] SSH client
+### Infrastructure as Code
+- Declarative VM configuration (Vagrantfile)
+- Reproducible environments
+- Version-controlled infrastructure
+- Provisioning automation
 
-### OCI Resources
-- [ ] OCI Account (Always Free tier)
-- [ ] API key pair created
-- [ ] VCN quota available (1 VCN for free tier)
-- [ ] Compute quota (2 Always Free VMs)
+### Configuration Management
+- Idempotent playbooks (run multiple times safely)
+- Role-based organization
+- Template-driven configs
+- State management
 
-### Accounts
-- [ ] GitHub account (for repo hosting)
-- [ ] Octopus Cloud account (free tier)
+### Deployment Automation
+- Service orchestration (systemd)
+- Reverse proxy setup (Nginx)
+- Multi-tier applications
+- Health checks and monitoring
 
----
-
-## 🛠️ Troubleshooting
-
-**Terraform "Authentication failed"**
-- Check `~/.oci/config` has correct OCIDs
-- Verify API key fingerprint matches OCI console
-- Ensure private key has correct permissions (600)
-
-**Ansible "Host unreachable"**
-- Check security list allows SSH from VM1 to VM2
-- Verify VM2 private IP in inventory
-- Test SSH manually: `ssh opc@<VM2_IP>`
-
-**Octopus Tentacle won't register**
-- Check firewall allows outbound 443
-- Verify Octopus Cloud instance URL
-- Check API key is correct
+### DevOps Best Practices
+- Control node pattern (bastion/jump server)
+- Private network communication
+- Firewall configuration
+- SSH key management
 
 ---
 
-## 📝 Learning Objectives
+## 💡 Why Vagrant Instead of Cloud?
 
-By completing this lab, you'll gain hands-on experience with:
+| Aspect | Vagrant (Local) | OCI Free Tier | Paid Cloud |
+|--------|-----------------|---------------|------------|
+| **Cost** | $0 | $0 | $10-50/month |
+| **RAM/VM** | 2-4GB | 1GB | 2-8GB |
+| **Setup Time** | 10 min | 30+ min | 5 min |
+| **Install Speed** | ⚡ Fast | 🐌 Very slow | ⚡ Fast |
+| **Iteration** | Instant | Slow | Fast |
+| **Learning** | ✅ Best | ⚠️ Frustrating | ✅ Good |
+| **Migration** | Easy → Cloud | N/A | N/A |
 
-✅ **Terraform:** IaC for cloud provisioning  
-✅ **Ansible:** Configuration management and app deployment  
-✅ **Octopus Deploy:** Release orchestration and environment promotion  
-✅ **OCI:** Oracle Cloud Infrastructure  
-✅ **CI/CD:** End-to-end automation pipeline  
-✅ **GitOps:** Infrastructure and config as code  
+**Bottom line:** Master DevOps locally first, then apply to cloud. Same Ansible playbooks work everywhere!
 
 ---
 
-**Next Step:** Follow `SETUP_GUIDE.md` for detailed Phase 1 instructions.
+## 🐛 Troubleshooting
+
+### VM Won't Start
+
+```powershell
+# Check VirtualBox is running
+& "C:\Program Files\Oracle\VirtualBox\VirtualBox.exe"
+
+# Enable VT-x in BIOS if needed
+systeminfo | findstr /i "hyper"
+
+# Re-provision
+vagrant destroy -f
+vagrant up
+```
+
+### Ansible Connection Failed
+
+```bash
+# From VM1
+
+# Test SSH manually
+ssh -i ~/.vagrant.d/insecure_private_key vagrant@192.168.56.11
+
+# Check network
+ping -c 3 192.168.56.11
+
+# Verbose debugging
+ansible all -m ping -vvv
+```
+
+### Flask App Not Accessible
+
+```bash
+# SSH to VM2 directly
+vagrant ssh vm2-app
+
+# Check service status
+sudo systemctl status flask-app
+sudo systemctl status nginx
+
+# Check firewall
+sudo firewall-cmd --list-services
+
+# Test locally
+curl http://localhost:5000
+```
+
+---
+
+## 🔄 Migration to Cloud
+
+**When you're ready for cloud deployment:**
+
+1. **OCI (Free Forever):** See `archive/terraform/` for configs
+2. **AWS:** Modify playbooks for Amazon Linux 2
+3. **Azure:** Use Azure Resource Manager + same playbooks
+4. **DigitalOcean:** Simplest cloud migration ($200 credit)
+
+**Your Ansible playbooks are cloud-agnostic!** Just update inventory IPs.
+
+---
+
+## 📞 Resources
+
+**Documentation:**
+- [Vagrant Docs](https://www.vagrantup.com/docs)
+- [Ansible Docs](https://docs.ansible.com)
+- [Octopus Deploy](https://octopus.com/docs)
+
+**This Project:**
+- Setup Guide: [SETUP_GUIDE.md](SETUP_GUIDE.md)
+- Architecture: [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md)
+- OCI Archive: [archive/README.md](archive/README.md)
+
+**Community:**
+- Vagrant: https://discuss.hashicorp.com/c/vagrant
+- Ansible: https://www.reddit.com/r/ansible
+- DevOps: https://www.reddit.com/r/devops
+
+---
+
+## 🎯 Success Metrics
+
+- [ ] Both VMs running (`vagrant status`)
+- [ ] Ansible can ping both VMs
+- [ ] Base config applied successfully
+- [ ] Flask app deployed and accessible
+- [ ] Can access http://localhost:5000 from browser
+- [ ] Understand each Ansible task
+- [ ] Can destroy/rebuild environment in <10 min
+
+---
+
+## 🚀 Next Steps
+
+**Today:**
+1. Complete Phase 1-2 (VMs + Ansible)
+2. Access Flask app in browser
+3. Modify playbook and re-deploy
+
+**This Week:**
+4. Set up Octopus Deploy
+5. Automate deployment pipeline
+6. Add monitoring/logging
+
+**This Month:**
+7. Learn Terraform Vagrant provider
+8. Create custom Ansible roles
+9. Deploy to real cloud (DigitalOcean/OCI)
+
+---
+
+## 📝 Change Log
+
+**2026-02-18:**
+- Migrated from OCI to Vagrant (performance issues)
+- Created comprehensive Vagrantfile
+- Updated all documentation
+- Archived OCI configs in `archive/`
+
+**2026-02-17:**
+- Initial project creation
+- OCI Terraform configs
+- Ansible playbooks
+
+---
+
+**Ready to learn DevOps the right way?** 🚀
+
+```powershell
+cd C:\code\oci-devops-lab
+vagrant up
+vagrant ssh vm1-control
+```
+
+**Happy learning!** 🎓

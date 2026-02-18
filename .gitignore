@@ -37,5 +37,12 @@ Thumbs.db
 *.pem
 *.key
 
+# Vagrant
+.vagrant/
+*.box
+Vagrantfile.local
+vagrant_ansible_inventory
+.vagrant.d/
+
 # Logs
 *.log

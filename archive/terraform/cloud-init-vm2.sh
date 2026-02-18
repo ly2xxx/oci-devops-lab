@@ -6,8 +6,8 @@ set -e
 # Set hostname
 hostnamectl set-hostname ${hostname}
 
-# Update system
-yum update -y
+# Skip full system update during cloud-init (causes OOM on 1GB RAM)
+# Update system manually after boot or via Ansible
 
 # Install basic packages
 yum install -y \
