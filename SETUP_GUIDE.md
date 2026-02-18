@@ -1,8 +1,8 @@
 # DevOps Lab Setup Guide - Vagrant Edition
 
-**Updated:** 2026-02-18  
+**Updated:** 2026-02-18 (Tested & Verified)  
 **Platform:** Vagrant + VirtualBox (Local VMs)  
-**Time to Complete:** 30-45 minutes  
+**Time to Complete:** 45-60 minutes  
 **Cost:** $0 (runs on your laptop)
 
 ---
@@ -16,7 +16,6 @@
 - ✅ **Full control over resources**
 
 **Learning:**
-- ✅ **Learn Terraform Vagrant provider** (still Infrastructure as Code!)
 - ✅ **Same Ansible playbooks** work locally and cloud
 - ✅ **Practice without cloud costs/limits**
 - ✅ **Faster iteration** (destroy/rebuild in minutes)
@@ -32,53 +31,51 @@
 ```
 Your Windows Laptop
     ├── VM1 (Control Node) - 192.168.56.10
-    │   ├── Terraform (Vagrant provider)
-    │   ├── Ansible
-    │   └── Workspace
+    │   ├── Terraform 1.7.5
+    │   ├── Ansible 2.9+
+    │   └── Workspace with playbooks
     │
     └── VM2 (App Server) - 192.168.56.11
-        ├── Nginx (reverse proxy)
-        ├── Flask Demo App
-        └── Managed by Ansible
+        ├── Nginx (reverse proxy on port 80)
+        ├── Flask Demo App (port 5000, internal)
+        └── Managed by Ansible from VM1
 ```
 
 **Access:**
-- VM1: `vagrant ssh vm1-control`
-- VM2: `vagrant ssh vm2-app`
-- Flask App: http://localhost:5000 (from your browser)
+- VM1 SSH: `vagrant ssh vm1-control`
+- VM2 SSH: `vagrant ssh vm2-app`
+- **Flask App:** http://localhost:8080 (from Windows browser)
 
 ---
 
-## 📦 Prerequisites
+## 📦 Phase 0: Prerequisites (15 minutes)
 
-### 1. Install VirtualBox
+### Step 1: Install VirtualBox
 
-**Windows (PowerShell):**
+**Windows (PowerShell as Administrator):**
 ```powershell
 winget install Oracle.VirtualBox
 ```
 
-**Or download manually:**
-https://www.virtualbox.org/wiki/Downloads
+**Or download manually:** https://www.virtualbox.org/wiki/Downloads
 
-**Verify:**
+**Verify installation:**
 ```powershell
 & "C:\Program Files\Oracle\VirtualBox\VBoxManage.exe" --version
 ```
 
 ---
 
-### 2. Install Vagrant
+### Step 2: Install Vagrant
 
-**Windows (PowerShell):**
+**Windows (PowerShell as Administrator):**
 ```powershell
 winget install Hashicorp.Vagrant
 ```
 
-**Or download manually:**
-https://www.vagrantup.com/downloads
+**Or download manually:** https://www.vagrantup.com/downloads
 
-**Verify:**
+**After installation, RESTART PowerShell** (to reload PATH), then verify:
 ```powershell
 vagrant --version
 # Should show: Vagrant 2.4.x
@@ -86,29 +83,34 @@ vagrant --version
 
 ---
 
-### 3. Enable Virtualization in BIOS
+### Step 3: Fix VirtualBox Host-Only Network (If Needed)
 
-**Check if enabled:**
+**Check if adapter exists:**
 ```powershell
-systeminfo | findstr /i "hyper"
+cd "C:\Program Files\Oracle\VirtualBox"
+.\VBoxManage.exe list hostonlyifs
 ```
 
-**If disabled:**
-- Reboot → Enter BIOS (F2/Del/F10)
-- Enable VT-x (Intel) or AMD-V (AMD)
-- Save and reboot
+**If empty or error, create it:**
+```powershell
+# Run as Administrator
+cd C:\code\oci-devops-lab
+.\force-fix-adapter.ps1
+
+# Or manually:
+cd "C:\Program Files\Oracle\VirtualBox"
+.\VBoxManage.exe hostonlyif create
+```
+
+**Verify adapter created:**
+```powershell
+Get-NetAdapter | Where-Object {$_.Name -like "*VirtualBox*"}
+# Should show: VirtualBox Host-Only Ethernet Adapter, Status: Up
+```
 
 ---
 
-### 4. Install Git (if not already)
-
-```powershell
-winget install Git.Git
-```
-
----
-
-## 🚀 Phase 1: Launch VMs (10 minutes)
+## 🚀 Phase 1: Launch VMs (10-15 minutes)
 
 ### Step 1: Navigate to Project
 
@@ -116,43 +118,37 @@ winget install Git.Git
 cd C:\code\oci-devops-lab
 ```
 
+---
+
 ### Step 2: Start VMs
 
 ```powershell
-# Download Oracle Linux 8 box (first time only, ~700MB)
-# Then create and provision both VMs
+# First time: Downloads Oracle Linux 8 box (~700MB) + provisions VMs
 vagrant up
 
 # This will:
-# - Download the base box (5-10 min, one-time)
-# - Create VM1 and VM2
-# - Install Terraform + Ansible on VM1
-# - Install basic tools on VM2
+# - Download base box (one-time, 5-10 min)
+# - Import and create VM1 and VM2
 # - Configure networking
+# - Attempt provisioning (might fail due to SSH timeout - expected!)
 ```
 
-**Output you'll see:**
+**Expected output:**
 ```
 ==> vm1-control: Importing base box 'generic/oracle8'...
-==> vm1-control: Forwarding ports...
+==> vm1-control: Booting VM...
 ==> vm1-control: Running provisioner: shell...
-=== Provisioning VM1 (Control Node) ===
-Installing Terraform...
-Installing Ansible...
-VM1 provisioning complete!
-Terraform: 1.7.5
-Ansible: 2.x
-
-==> vm2-app: Importing base box 'generic/oracle8'...
-==> vm2-app: Running provisioner: shell...
-=== Provisioning VM2 (App Server) ===
-VM2 provisioning complete!
+    vm1-control: === Provisioning VM1 (Control Node) ===
+... (might timeout here - that's OK!)
 ```
+
+**Note:** Provisioning might fail with "SSH connection unexpectedly closed" during `yum update`. This is **expected** - we'll fix it manually.
+
+---
 
 ### Step 3: Verify VMs Are Running
 
 ```powershell
-# Check status
 vagrant status
 
 # Should show:
@@ -160,9 +156,28 @@ vagrant status
 # vm2-app        running (virtualbox)
 ```
 
+**If VM2 didn't start:**
+```powershell
+vagrant up vm2-app
+```
+
 ---
 
-## 🔧 Phase 2: Configure Control Node (15 minutes)
+### Step 4: Test Network Connectivity
+
+```powershell
+# Ping VM1
+ping 192.168.56.10
+
+# Ping VM2
+ping 192.168.56.11
+
+# Both should respond
+```
+
+---
+
+## 🔧 Phase 2: Configure VM1 (Control Node) - 15 minutes
 
 ### Step 1: SSH to VM1
 
@@ -170,43 +185,128 @@ vagrant status
 vagrant ssh vm1-control
 ```
 
-**You're now inside VM1!**
+You're now inside VM1!
 
-### Step 2: Verify Installations
+---
+
+### Step 2: Check What Got Installed
 
 ```bash
-# Check installed tools
-terraform --version
-ansible --version
-git --version
-python3 --version
-
-#if not installed, run the following command:
-sudo yum install -y git wget curl vim unzip python3-pip && cd /tmp && wget -q https://releases.hashicorp.com/terraform/1.7.5/terraform_1.7.5_linux_amd64.zip && unzip -o terraform_1.7.5_linux_amd64.zip && sudo mv terraform /usr/local/bin/ && sudo chmod +x /usr/local/bin/terraform && rm terraform_1.7.5_linux_amd64.zip && sudo pip3 install --upgrade pip && sudo pip3 install ansible && mkdir -p ~/workspace && echo "✅ Setup complete!" && terraform --version && ansible --version && git --version
-
-# Check network connectivity to VM2
-ping -c 3 192.168.56.11
+# Check if provisioning completed
+terraform --version  # Likely: command not found
+ansible --version    # Likely: command not found
+git --version        # Likely: command not found
 ```
 
-### Step 3: Set Up Ansible Inventory
+**If commands not found**, provisioning failed (expected). Continue to Step 3.
+
+---
+
+### Step 3: Install Packages Manually
+
+**Copy-paste this entire block:**
 
 ```bash
-# Create Ansible directory structure
-mkdir -p ~/workspace/ansible/inventory
-cd ~/workspace/ansible
+# Install essential packages (skip full yum update - too slow)
+sudo yum install -y git wget curl vim unzip python3-pip
 
-# Create inventory file
-# Generate SSH key if not already done
-if [ ! -f ~/.ssh/id_rsa ]; then
-    ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
-fi
+# Install Terraform
+cd /tmp
+wget -q https://releases.hashicorp.com/terraform/1.7.5/terraform_1.7.5_linux_amd64.zip
+unzip -o terraform_1.7.5_linux_amd64.zip
+sudo mv terraform /usr/local/bin/
+sudo chmod +x /usr/local/bin/terraform
+rm terraform_1.7.5_linux_amd64.zip
+
+# Install Ansible
+sudo pip3 install --upgrade pip
+sudo pip3 install ansible
+
+# Create workspace
+mkdir -p ~/workspace
+
+# Generate SSH key for Ansible
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa -N ""
+```
+
+**This takes ~3-5 minutes.**
+
+---
+
+### Step 4: Verify Installations
+
+```bash
+terraform --version   # Should show: Terraform v1.7.5
+ansible --version     # Should show: ansible 2.9.x (with Python 3.6 warning - ignore it)
+git --version         # Should show: git 2.x
+python3 --version     # Should show: Python 3.6.8
+```
+
+---
+
+### Step 5: Test Connectivity to VM2
+
+```bash
+# Ping VM2
+ping -c 3 192.168.56.11
+
+# Should get 3 replies
+```
+
+---
+
+## 📝 Phase 3: Set Up Ansible (10 minutes)
+
+### Step 1: Create Ansible Directory Structure
+
+```bash
+cd ~/workspace
+mkdir -p ansible/inventory
+mkdir -p ansible/playbooks
+cd ansible
+```
+
+---
+
+### Step 2: Create ansible.cfg
+
+```bash
+cat > ansible.cfg << 'EOF'
+[defaults]
+inventory = inventory/hosts.yml
+host_key_checking = False
+retry_files_enabled = False
+stdout_callback = yaml
+deprecation_warnings = False
+
+[privilege_escalation]
+become = True
+become_method = sudo
+become_user = root
+become_ask_pass = False
+EOF
+```
+
+---
+
+### Step 3: Copy SSH Key to VM2
+
+```bash
+# Install sshpass (for password-based key copy)
+sudo yum install -y sshpass
 
 # Copy public key to VM2
-ssh-copy-id -o StrictHostKeyChecking=no vagrant@192.168.56.11
-# Password: vagrant
+sshpass -p vagrant ssh-copy-id -o StrictHostKeyChecking=no vagrant@192.168.56.11
+```
 
-# Update inventory to use the correct key
-cat > ~/workspace/ansible/inventory/hosts.yml << 'EOF'
+**Expected output:** "Number of key(s) added: 1"
+
+---
+
+### Step 4: Create Ansible Inventory
+
+```bash
+cat > inventory/hosts.yml << 'EOF'
 all:
   children:
     control:
@@ -223,64 +323,39 @@ all:
           ansible_ssh_private_key_file: ~/.ssh/id_rsa
           ansible_ssh_common_args: '-o StrictHostKeyChecking=no'
 EOF
-
-# Create ansible.cfg
-cat > ansible.cfg << 'EOF'
-[defaults]
-inventory = inventory/hosts.yml
-host_key_checking = False
-retry_files_enabled = False
-stdout_callback = yaml
-
-[privilege_escalation]
-become = True
-become_method = sudo
-become_user = root
-become_ask_pass = False
-EOF
-```
-
-### Step 4: Test Ansible Connectivity
-
-```bash
-# Ping all hosts
-ansible all -m ping
-
-# Expected output:
-# vm1 | SUCCESS => {
-#     "changed": false,
-#     "ping": "pong"
-# }
-# vm2 | SUCCESS => {
-#     "changed": false,
-#     "ping": "pong"
-# }
-```
-
-**If VM2 fails:**
-```bash
-# Add Vagrant's SSH key to known hosts manually
-ssh-keyscan -H 192.168.56.11 >> ~/.ssh/known_hosts
-
-# Or SSH once manually to accept key
-ssh -i ~/.vagrant.d/insecure_private_key vagrant@192.168.56.11
-# Password: vagrant (if prompted)
-# Type 'exit' to return to VM1
 ```
 
 ---
 
-## 📝 Phase 3: Create Ansible Playbooks (10 minutes)
+### Step 5: Test Ansible Connectivity
+
+```bash
+ansible all -m ping
+```
+
+**Expected output:**
+```yaml
+vm1 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+vm2 | SUCCESS => {
+    "changed": false,
+    "ping": "pong"
+}
+```
+
+✅ **If both show SUCCESS, Ansible is working!**
+
+---
+
+## 🎭 Phase 4: Create and Run Ansible Playbooks (15 minutes)
 
 ### Playbook 1: Base Configuration
 
 ```bash
 cd ~/workspace/ansible
 
-# Create playbooks directory
-mkdir -p playbooks
-
-# Create base config playbook
 cat > playbooks/base-config.yml << 'EOF'
 ---
 - name: Configure base system on all hosts
@@ -288,12 +363,8 @@ cat > playbooks/base-config.yml << 'EOF'
   become: yes
   
   tasks:
-      # Skip system update - too resource intensive for 2GB VMs
-    #- name: Ensure system packages are up to date
-    #  yum:
-    #    name: '*'
-    #    state: latest
-    #    update_cache: yes
+    # Skip full system update - too resource intensive
+    # Can be done manually later: sudo yum update -y
     
     - name: Install essential packages
       yum:
@@ -303,7 +374,6 @@ cat > playbooks/base-config.yml << 'EOF'
           - wget
           - curl
           - net-tools
-         # - htop
         state: present
     
     - name: Set timezone to Europe/London
@@ -330,6 +400,20 @@ cat > playbooks/base-config.yml << 'EOF'
         state: restarted
 EOF
 ```
+
+**Run the playbook:**
+```bash
+ansible-playbook playbooks/base-config.yml
+```
+
+**Expected output:**
+```
+PLAY RECAP
+vm1    : ok=X    changed=X
+vm2    : ok=X    changed=X
+```
+
+---
 
 ### Playbook 2: Deploy Flask App
 
@@ -391,7 +475,7 @@ cat > playbooks/deploy-app.yml << 'EOF'
                   <hr>
                   <p>✅ VM provisioning: Vagrant</p>
                   <p>✅ Configuration: Ansible</p>
-                  <p>✅ Deployment: Octopus (coming soon)</p>
+                  <p>✅ Deployment: Automated playbook</p>
                 </body>
               </html>
               """
@@ -436,6 +520,33 @@ cat > playbooks/deploy-app.yml << 'EOF'
         state: started
         enabled: yes
     
+    - name: Create clean Nginx config
+      copy:
+        content: |
+          user nginx;
+          worker_processes auto;
+          error_log /var/log/nginx/error.log;
+          pid /run/nginx.pid;
+          
+          events {
+              worker_connections 1024;
+          }
+          
+          http {
+              include /etc/nginx/mime.types;
+              default_type application/octet-stream;
+              
+              access_log /var/log/nginx/access.log;
+              
+              sendfile on;
+              keepalive_timeout 65;
+              
+              include /etc/nginx/conf.d/*.conf;
+          }
+        dest: /etc/nginx/nginx.conf
+        mode: '0644'
+      notify: restart nginx
+    
     - name: Configure Nginx as reverse proxy
       copy:
         content: |
@@ -453,11 +564,6 @@ cat > playbooks/deploy-app.yml << 'EOF'
         mode: '0644'
       notify: restart nginx
     
-    - name: Remove default Nginx config
-      file:
-        path: /etc/nginx/conf.d/default.conf
-        state: absent
-    
     - name: Configure firewall for HTTP
       firewalld:
         service: "{{ item }}"
@@ -467,6 +573,12 @@ cat > playbooks/deploy-app.yml << 'EOF'
       loop:
         - http
         - https
+    
+    - name: Allow Nginx to connect to Flask (SELinux)
+      seboolean:
+        name: httpd_can_network_connect
+        state: yes
+        persistent: yes
     
     - name: Start and enable Nginx
       systemd:
@@ -482,88 +594,74 @@ cat > playbooks/deploy-app.yml << 'EOF'
 EOF
 ```
 
----
-
-## ▶️ Phase 4: Run Playbooks (5 minutes)
-
-### Run Base Configuration
-
+**Run the playbook:**
 ```bash
-cd ~/workspace/ansible
-
-# Apply base config to all VMs
-ansible-playbook playbooks/base-config.yml
-
-# Expected output:
-# PLAY RECAP
-# vm1    : ok=X    changed=X
-# vm2    : ok=X    changed=X
-```
-
-### Deploy Flask App
-
-```bash
-# Deploy app to VM2
 ansible-playbook playbooks/deploy-app.yml
+```
 
-# Expected output:
-# PLAY RECAP
-# vm2    : ok=X    changed=X
+**Expected output:**
+```
+PLAY RECAP
+vm2    : ok=14   changed=10   unreachable=0   failed=0
 ```
 
 ---
 
-## 🌐 Phase 5: Test the Application
+## 🌐 Phase 5: Test the Application (5 minutes)
 
-### From VM1 (inside vagrant ssh):
+### From VM1 (via SSH):
 
 ```bash
-# Test Flask app directly
-curl http://192.168.56.11:5000
-
-# Test via Nginx
+# Test Flask app via Nginx
 curl http://192.168.56.11
+
+# Should see HTML with "🚀 DevOps Lab - Flask Demo"
 ```
+
+---
 
 ### From Your Windows Browser:
 
-**Open:** http://localhost:5000
+**Open:** http://localhost:8080
 
-You should see:
+**You should see:**
 ```
 🚀 DevOps Lab - Flask Demo
+
 Hostname: vm2-app
 Server IP: 192.168.56.11
 Deployed with: Vagrant + Ansible
 
 ✅ VM provisioning: Vagrant
 ✅ Configuration: Ansible
-✅ Deployment: Octopus (coming soon)
+✅ Deployment: Automated playbook
 ```
+
+✅ **Success!** Your DevOps lab is fully operational!
 
 ---
 
 ## 🎓 What You've Accomplished
 
 - ✅ **Infrastructure as Code:** Vagrantfile defines VM resources
+- ✅ **VM Provisioning:** 2 Oracle Linux 8 VMs with 2GB RAM each
 - ✅ **Configuration Management:** Ansible playbooks configure VMs
 - ✅ **Application Deployment:** Flask app deployed automatically
 - ✅ **Service Management:** Systemd services, Nginx reverse proxy
-- ✅ **Networking:** Private network, port forwarding
+- ✅ **Networking:** Private network + port forwarding
+- ✅ **Security:** Firewall rules, SELinux configuration
 
 ---
 
 ## 🔧 Common Commands
 
-### Vagrant Management
+### Vagrant Management (from Windows)
 
 ```powershell
-# On your Windows machine (C:\code\oci-devops-lab)
-
 # Start VMs
 vagrant up
 
-# Stop VMs (saves state)
+# Stop VMs (preserves state)
 vagrant halt
 
 # Restart VMs
@@ -579,20 +677,18 @@ vagrant ssh vm2-app
 # Check VM status
 vagrant status
 
-# View VM info
+# View SSH config
 vagrant ssh-config
 ```
 
 ### Ansible (from VM1)
 
 ```bash
-# Inside VM1
-
 # Ping all hosts
 ansible all -m ping
 
 # Run ad-hoc command
-ansible app_servers -m shell -a "uptime"
+ansible app_servers -m shell -a "systemctl status flask-app"
 
 # Run playbook
 ansible-playbook playbooks/deploy-app.yml
@@ -617,9 +713,16 @@ ansible-playbook playbooks/deploy-app.yml -vvv
 # Check logs
 vagrant up --debug
 
-# Try reloading
-vagrant reload
+# Force recreate host-only adapter
+cd C:\code\oci-devops-lab
+.\force-fix-adapter.ps1
+
+# Destroy and retry
+vagrant destroy -f
+vagrant up
 ```
+
+---
 
 ### Ansible Can't Connect to VM2
 
@@ -627,59 +730,86 @@ vagrant reload
 # From VM1
 
 # Test SSH manually
-ssh -i ~/.vagrant.d/insecure_private_key vagrant@192.168.56.11
+ssh vagrant@192.168.56.11
 
-# Check if VM2 is up
-ping -c 3 192.168.56.11
+# Re-copy SSH key
+sshpass -p vagrant ssh-copy-id vagrant@192.168.56.11
 
-# Re-run inventory test
+# Check inventory
+cat ~/workspace/ansible/inventory/hosts.yml
+
+# Verbose Ansible ping
 ansible all -m ping -vvv
 ```
 
-### Can't Access Flask App
+---
+
+### Flask App Not Accessible
 
 ```bash
 # From VM1
 
-# Check Flask service status
+# Check services on VM2
 ansible app_servers -m shell -a "systemctl status flask-app"
-
-# Check Nginx status
 ansible app_servers -m shell -a "systemctl status nginx"
 
 # Check firewall
 ansible app_servers -m shell -a "firewall-cmd --list-services"
 
+# Check SELinux (502 errors)
+ansible app_servers -m shell -a "getsebool httpd_can_network_connect"
+
+# If "off", enable it
+ansible app_servers -m shell -a "setsebool -P httpd_can_network_connect 1" --become
+
 # Test locally on VM2
 vagrant ssh vm2-app
-curl http://localhost:5000
+curl http://localhost
 ```
 
-### Port 5000 Already in Use on Windows
+---
+
+### Port 8080 Not Working from Windows
 
 ```powershell
-# Find what's using port 5000
-netstat -ano | findstr :5000
+# Check if port 8080 is in use
+netstat -ano | findstr :8080
 
-# Kill the process (if safe)
-Stop-Process -Id <PID> -Force
+# Check Vagrantfile port forwarding
+cat Vagrantfile | findstr "forwarded_port"
 
-# Or change port in Vagrantfile:
-# vm2.vm.network "forwarded_port", guest: 5000, host: 5001
+# Should show:
+# vm2.vm.network "forwarded_port", guest: 80, host: 8080
+
+# If port conflict, change in Vagrantfile:
+# vm2.vm.network "forwarded_port", guest: 80, host: 8081
+
+# Then reload
+vagrant reload vm2-app
 ```
+
+---
+
+### Provisioning Keeps Failing
+
+**Expected:** Provisioning fails due to `yum update -y` timeout. This is normal.
+
+**Solution:** Manual installation (covered in Phase 2, Step 3).
+
+**Permanent fix (already applied):** Vagrantfile has been updated to skip `yum update -y`.
 
 ---
 
 ## 📚 Next Steps
 
-### Phase 6: Octopus Deploy Integration
+### Phase 6: Octopus Deploy Integration (Optional)
 
-1. Sign up for Octopus Cloud (free trial)
+1. Sign up for Octopus Cloud (free trial): https://octopus.com/start
 2. Install Tentacle on VMs
 3. Create deployment project
 4. Automate Flask app deployment via Octopus
 
-### Phase 7: Terraform with Vagrant Provider
+### Phase 7: Advanced Terraform (Optional)
 
 Learn to provision Vagrant VMs with Terraform:
 
@@ -700,7 +830,7 @@ resource "vagrant_vm" "vm1" {
 }
 ```
 
-### Phase 8: Migrate to Cloud
+### Phase 8: Migrate to Cloud (When Ready)
 
 Once comfortable locally:
 - Use same Ansible playbooks on OCI/AWS/Azure
@@ -711,45 +841,69 @@ Once comfortable locally:
 
 ## 💡 Pro Tips
 
-**Snapshot VMs:**
+**Snapshot VMs before major changes:**
 ```bash
-# Take snapshot before risky changes
-VBoxManage snapshot <vm-name> take "before-change"
-
-# Restore if needed
-VBoxManage snapshot <vm-name> restore "before-change"
+# In VirtualBox GUI
+# Right-click VM → Snapshots → Take snapshot
+# Or via command:
+VBoxManage snapshot "devops-lab-vm1-control" take "before-change"
 ```
 
-**Faster Rebuilds:**
+**Faster rebuilds:**
 ```powershell
 # Destroy and recreate in one command
 vagrant destroy -f && vagrant up
 ```
 
-**Synced Folders:**
-Uncomment in Vagrantfile to share code:
+**Share code with VMs:**
 ```ruby
+# Uncomment in Vagrantfile:
 config.vm.synced_folder ".", "/vagrant"
 ```
-
 Then your Windows files appear at `/vagrant` in VMs!
+
+**Fix Python 3.6 deprecation warning:**
+Oracle Linux 8 ships with Python 3.6. The Ansible warning is cosmetic - everything works fine. To suppress:
+```bash
+echo "deprecation_warnings = False" >> ~/workspace/ansible/ansible.cfg
+```
 
 ---
 
 ## 📞 Support
 
 **Issues?**
-- Check `archive/` folder for OCI-specific docs
+- Check troubleshooting section above
+- Review `archive/` folder for OCI-specific issues (similar problems, different platform)
 - Vagrant docs: https://www.vagrantup.com/docs
 - Ansible docs: https://docs.ansible.com
 - VirtualBox manual: https://www.virtualbox.org/manual
 
+**Project Files:**
+- README.md - Project overview
+- PROJECT_SUMMARY.md - Architecture details
+- MIGRATION_SUMMARY.md - Why we moved from OCI to Vagrant
+- archive/ - Original OCI setup (preserved for reference)
+
 ---
 
-**Ready to learn DevOps the fast way!** 🚀
+## ✅ Success Checklist
 
-Start with:
-```powershell
-cd C:\code\oci-devops-lab
-vagrant up
-```
+- [ ] VirtualBox installed and host-only adapter working
+- [ ] Vagrant installed and PATH updated
+- [ ] Both VMs running (`vagrant status` shows both "running")
+- [ ] Can SSH to VM1 and VM2
+- [ ] Terraform and Ansible installed on VM1
+- [ ] Ansible can ping both VMs successfully
+- [ ] Base config playbook completed without errors
+- [ ] Deploy app playbook completed without errors
+- [ ] Flask app accessible from VM1: `curl http://192.168.56.11`
+- [ ] Flask app accessible from Windows browser: http://localhost:8080
+
+**If all checked:** Congratulations! 🎉 You've mastered the DevOps lab setup!
+
+---
+
+**Ready to learn DevOps the right way!** 🚀
+
+**Questions? Stuck?** Review the troubleshooting section or check archive/ for additional insights.
