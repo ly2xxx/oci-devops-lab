@@ -34,28 +34,47 @@ Get VM1 and VM2 running on OCI with Terraform, then configure VM2 with Ansible t
 
 4. **Generate API Key Pair**
    
-   On your **Windows machine**, open PowerShell:
-   ```powershell
+   On your **Windows machine**, open Git Bash or PowerShell:
+   ```bash
    # Create .oci directory
-   mkdir C:\Users\vl\.oci
-   cd C:\Users\vl\.oci
+   mkdir -p ~/.oci
+   cd ~/.oci
    
-   # Generate key pair (use Git Bash or WSL if available)
-   # OR use PuTTYgen on Windows
-   ssh-keygen -t rsa -b 4096 -f oci_api_key -N ""
+   # Generate key pair in PEM format (REQUIRED by OCI!)
+   ssh-keygen -t rsa -b 4096 -m PEM -f oci_api_key -N ""
+   
+   # Rename to .pem extension
+   mv oci_api_key oci_api_key.pem
    
    # This creates:
-   # oci_api_key (private key)
+   # oci_api_key.pem (private key in PEM format)
    # oci_api_key.pub (public key)
+   ```
+   
+   **⚠️ Critical:** The `-m PEM` flag is required! OCI does NOT accept OpenSSH format keys.
+   
+   **Verify correct format:**
+   ```bash
+   head -1 ~/.oci/oci_api_key.pem
+   # Should show: -----BEGIN PRIVATE KEY-----
+   # NOT: -----BEGIN OPENSSH PRIVATE KEY-----
    ```
 
 5. **Add Public Key to OCI**
    - In OCI Console: **Identity → Users → Your Username → API Keys**
    - Click **Add API Key**
    - Choose **Paste Public Key**
-   - Open `C:\Users\vl\.oci\oci_api_key.pub` and paste contents
+   - Open `~/.oci/oci_api_key.pub` (or `C:\Users\vl\.oci\oci_api_key.pub` on Windows) and paste contents
    - Click **Add**
    - **Copy the fingerprint** shown (you'll need this)
+   
+   **Verify PEM format:**
+   ```bash
+   # Your private key should start with:
+   head -1 ~/.oci/oci_api_key.pem
+   # Should output: -----BEGIN PRIVATE KEY-----
+   # NOT: -----BEGIN OPENSSH PRIVATE KEY-----
+   ```
 
 ### Step 1.2: Configure SSH Key for VM Access
 
@@ -76,7 +95,7 @@ ssh-keygen -t rsa -b 4096 -f id_rsa -N ""
 ### Step 2.1: Install Terraform (if not installed)
 
 ```powershell
-# Using Chocolatey
+# Using Chocolatey - (Run as administrator)
 choco install terraform -y
 
 # Verify

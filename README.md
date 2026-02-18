@@ -38,7 +38,7 @@
 
 ### **Phase 1: OCI Setup & Terraform Foundation** (Tonight)
 **Time:** 1-2 hours
-
+https://signup.oraclecloud.com/ 
 1. **OCI Account Prep**
    - [ ] Log into OCI Console
    - [ ] Note down: Tenancy OCID, User OCID, Region

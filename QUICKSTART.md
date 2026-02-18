@@ -9,7 +9,26 @@
 - [ ] OCI Account (Always Free tier)
 - [ ] Terraform installed (`terraform version`)
 - [ ] SSH key pair generated (`~/.ssh/id_rsa.pub`)
-- [ ] OCI API key created and configured
+- [ ] OCI API key created in **PEM format** (not OpenSSH!)
+
+---
+
+## ⚠️ Important: OCI API Key Format
+
+**OCI requires PEM format, not OpenSSH format!**
+
+**Correct command:**
+```bash
+ssh-keygen -t rsa -b 4096 -m PEM -f ~/.oci/oci_api_key -N ""
+mv ~/.oci/oci_api_key ~/.oci/oci_api_key.pem
+```
+
+**Verify:**
+```bash
+head -1 ~/.oci/oci_api_key.pem
+# Should show: -----BEGIN PRIVATE KEY-----
+# NOT: -----BEGIN OPENSSH PRIVATE KEY-----
+```
 
 ---
 
@@ -30,6 +49,13 @@ notepad terraform.tfvars
 # - fingerprint
 # - region
 # - compartment_ocid
+# - Use absolute paths: C:/Users/vl/.oci/oci_api_key.pem
+```
+
+**Important:** On Windows, use absolute paths with forward slashes:
+```hcl
+private_key_path = "C:/Users/vl/.oci/oci_api_key.pem"
+ssh_public_key_path = "C:/Users/vl/.ssh/id_rsa.pub"
 ```
 
 ### 2. Initialize Terraform (2 min)
@@ -122,7 +148,15 @@ Once VMs are running:
 **Terraform fails with "authentication error":**
 - Check `terraform.tfvars` has correct OCIDs
 - Verify API key fingerprint
-- Ensure private key exists at path
+- **Ensure private key is in PEM format** (not OpenSSH)
+- Check key file permissions: `chmod 600 ~/.oci/oci_api_key.pem`
+
+**How to check key format:**
+```bash
+head -1 ~/.oci/oci_api_key.pem
+# PEM format: -----BEGIN PRIVATE KEY-----
+# OpenSSH format: -----BEGIN OPENSSH PRIVATE KEY----- (WRONG!)
+```
 
 **VM won't start:**
 - Check Always Free capacity in your region
