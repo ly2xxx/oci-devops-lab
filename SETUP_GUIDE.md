@@ -868,6 +868,32 @@ Oracle Linux 8 ships with Python 3.6. The Ansible warning is cosmetic - everythi
 echo "deprecation_warnings = False" >> ~/workspace/ansible/ansible.cfg
 ```
 
+**Upload playbook to VM1:**
+```bash
+#vagrant upload <source> <destination> <vm-name>
+vagrant upload config/ansible/playbooks/install-configu.yml /home/vagrant/ansible/playbooks/install-configu.yml vm1-control
+```
+
+**Update node version on the fly**
+```bash
+# First, check what repos are available
+sudo dnf module list nodejs
+
+# Remove the old Node.js 20.x repo
+sudo dnf remove -y nodejs npm
+
+# Clean dnf cache
+sudo dnf clean all
+
+# Run the NodeSource 24.x setup again manually
+curl -fsSL https://rpm.nodesource.com/setup_24.x | sudo bash -
+
+# Install Node.js 24.x
+sudo dnf install -y nodejs
+
+# Verify version
+node --version  # Should show v24.x.x
+```
 ---
 
 ## 📞 Support

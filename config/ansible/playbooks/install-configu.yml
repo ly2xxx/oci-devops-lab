@@ -13,27 +13,36 @@
   tasks:
     - name: Install Node.js (Configu dependency)
       block:
-        - name: Download NodeSource setup script
+        - name: Download NodeSource setup script for Node.js 24.x
           get_url:
-            url: https://rpm.nodesource.com/setup_20.x
+            url: https://rpm.nodesource.com/setup_24.x
             dest: /tmp/nodesource_setup.sh
             mode: '0755'
             
         - name: Run NodeSource setup
           shell: bash /tmp/nodesource_setup.sh
           args:
-            creates: /etc/yum.repos.d/nodesource-el8.repo
+            creates: /etc/yum.repos.d/nodesource-el*.repo
             
-        - name: Install Node.js
+        - name: Upgrade Node.js to latest from repository
           dnf:
             name: nodejs
-            state: present
+            state: latest
             
-    - name: Install Configu CLI globally
+        - name: Verify Node.js version
+          command: node --version
+          register: nodejs_version_output
+          changed_when: false
+          
+        - name: Display Node.js version
+          debug:
+            msg: "Node.js version: {{ nodejs_version_output.stdout }}"
+            
+    - name: Install/Upgrade Configu CLI globally
       npm:
         name: "@configu/cli"
         global: yes
-        state: present
+        state: latest
         
     - name: Verify Configu installation
       command: configu --version
