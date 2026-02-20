@@ -1,0 +1,38 @@
+{
+  "DATABASE_HOST": {
+    "type": "String",
+    "required": true,
+    "description": "Database server hostname"
+  },
+  "DATABASE_PORT": {
+    "type": "Number",
+    "default": 5432,
+    "description": "Database server port"
+  },
+  "DATABASE_NAME": {
+    "type": "String",
+    "required": true,
+    "description": "Database name"
+  },
+  "DATABASE_USER": {
+    "type": "String",
+    "required": true,
+    "description": "Database username"
+  },
+  "DATABASE_PASSWORD": {
+    "type": "String",
+    "required": true,
+    "description": "Database password - use secrets management"
+  },
+  "DATABASE_POOL_SIZE": {
+    "type": "Number",
+    "default": 10,
+    "description": "Connection pool size"
+  },
+  "DATABASE_SSL_MODE": {
+    "type": "String",
+    "default": "prefer",
+    "pattern": "^(disable|allow|prefer|require|verify-ca|verify-full)$",
+    "description": "PostgreSQL SSL mode"
+  }
+}

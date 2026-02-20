@@ -1,0 +1,29 @@
+{
+  "APP_NAME": {
+    "type": "String",
+    "required": true,
+    "description": "Application name"
+  },
+  "ENVIRONMENT": {
+    "type": "String",
+    "required": true,
+    "pattern": "^(development|staging|production)$",
+    "description": "Deployment environment"
+  },
+  "PORT": {
+    "type": "Number",
+    "default": 5000,
+    "description": "HTTP server port"
+  },
+  "DEBUG_MODE": {
+    "type": "Boolean",
+    "default": false,
+    "description": "Enable debug mode"
+  },
+  "LOG_LEVEL": {
+    "type": "String",
+    "default": "INFO",
+    "pattern": "^(DEBUG|INFO|WARNING|ERROR|CRITICAL)$",
+    "description": "Logging level"
+  }
+}

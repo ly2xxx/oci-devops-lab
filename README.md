@@ -119,19 +119,26 @@ ping -c 3 192.168.56.11  # Test connectivity to VM2
 - [x] Flask app deployment playbook
 - [x] Nginx reverse proxy setup
 
-### 🔄 Phase 3: Octopus Deploy Integration (IN PROGRESS)
+### 🆕 Phase 3: Configu - Modern Config Management (NEW!)
+- [ ] Install Configu CLI
+- [ ] Exercise 1: Config basics & schemas
+- [ ] Exercise 2: Multi-environment configs
+- [ ] Exercise 3: Secrets management
+- [ ] Exercise 4: Flask app integration
+
+### 🔄 Phase 4: Octopus Deploy Integration (IN PROGRESS)
 - [ ] Sign up for Octopus Cloud
 - [ ] Install Tentacles on VMs
 - [ ] Create deployment project
 - [ ] Automate Flask deployment
 
-### 📋 Phase 4: Advanced Terraform (PLANNED)
+### 📋 Phase 5: Advanced Terraform (PLANNED)
 - [ ] Terraform Vagrant provider
 - [ ] Infrastructure modules
 - [ ] State management
 - [ ] Variable-driven deployments
 
-### 📋 Phase 5: CI/CD Pipeline (PLANNED)
+### 📋 Phase 6: CI/CD Pipeline (PLANNED)
 - [ ] GitHub Actions workflow
 - [ ] Automated testing
 - [ ] Blue-green deployments
@@ -193,6 +200,38 @@ ansible app_servers -m shell -a "systemctl status flask-app"
 curl http://192.168.56.11
 ```
 
+### Configu (from VM1)
+
+```bash
+# SSH to VM1 first
+vagrant ssh vm1-control
+
+# Install Configu
+cd ~/workspace/ansible
+ansible-playbook playbooks/install-configu.yml
+
+# Start exercises
+cd ~/workspace/configu-exercises
+cat README.md
+
+# Exercise 1: Basics
+cd exercise-1-basics
+cat README.md
+# Follow instructions
+
+# Exercise 2: Environments
+cd ../exercise-2-environments
+cat README.md
+
+# Exercise 3: Secrets
+cd ../exercise-3-secrets
+cat README.md
+
+# Exercise 4: Flask integration
+cd ../exercise-4-flask-app
+cat README.md
+```
+
 ---
 
 ## 🎓 What You Learn
@@ -209,6 +248,13 @@ curl http://192.168.56.11
 - Template-driven configs
 - State management
 
+### Modern Config Management (Configu)
+- Type-safe configuration schemas
+- Multi-environment configs (dev/staging/prod)
+- Secrets management best practices
+- Feature flags and deployment patterns
+- Config validation and testing
+
 ### Deployment Automation
 - Service orchestration (systemd)
 - Reverse proxy setup (Nginx)
@@ -220,6 +266,7 @@ curl http://192.168.56.11
 - Private network communication
 - Firewall configuration
 - SSH key management
+- Configuration as Code
 
 ---
 

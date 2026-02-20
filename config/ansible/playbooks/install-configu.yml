@@ -1,0 +1,116 @@
+---
+# Install Configu CLI and setup exercises
+# Run with: ansible-playbook playbooks/install-configu.yml
+
+- name: Install Configu Configuration Management Tool
+  hosts: all
+  become: yes
+  
+  vars:
+    configu_version: "latest"
+    workspace_dir: "/home/vagrant/workspace"
+    
+  tasks:
+    - name: Install Node.js (Configu dependency)
+      block:
+        - name: Download NodeSource setup script
+          get_url:
+            url: https://rpm.nodesource.com/setup_20.x
+            dest: /tmp/nodesource_setup.sh
+            mode: '0755'
+            
+        - name: Run NodeSource setup
+          shell: bash /tmp/nodesource_setup.sh
+          args:
+            creates: /etc/yum.repos.d/nodesource-el8.repo
+            
+        - name: Install Node.js
+          dnf:
+            name: nodejs
+            state: present
+            
+    - name: Install Configu CLI globally
+      npm:
+        name: "@configu/cli"
+        global: yes
+        state: present
+        
+    - name: Verify Configu installation
+      command: configu --version
+      register: configu_version_output
+      changed_when: false
+      
+    - name: Display Configu version
+      debug:
+        msg: "Configu CLI installed: {{ configu_version_output.stdout }}"
+        
+    - name: Create Configu workspace directory
+      file:
+        path: "{{ workspace_dir }}/configu-exercises"
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: '0755'
+        
+    - name: Create Configu exercises structure
+      file:
+        path: "{{ workspace_dir }}/configu-exercises/{{ item }}"
+        state: directory
+        owner: vagrant
+        group: vagrant
+        mode: '0755'
+      loop:
+        - exercise-1-basics
+        - exercise-2-environments
+        - exercise-3-secrets
+        - exercise-4-flask-app
+        - schemas
+        - stores
+        
+    - name: Copy Configu exercise files
+      template:
+        src: "../templates/configu/{{ item.src }}"
+        dest: "{{ workspace_dir }}/configu-exercises/{{ item.dest }}"
+        owner: vagrant
+        group: vagrant
+        mode: '0644'
+      loop:
+        - { src: 'README.md', dest: 'README.md' }
+        - { src: 'exercise-1.md', dest: 'exercise-1-basics/README.md' }
+        - { src: 'exercise-2.md', dest: 'exercise-2-environments/README.md' }
+        - { src: 'exercise-3.md', dest: 'exercise-3-secrets/README.md' }
+        - { src: 'exercise-4.md', dest: 'exercise-4-flask-app/README.md' }
+        - { src: 'app-schema.cfgu.json', dest: 'schemas/app.cfgu.json' }
+        - { src: 'database-schema.cfgu.json', dest: 'schemas/database.cfgu.json' }
+      ignore_errors: yes  # Templates will be created separately
+      
+    - name: Create sample .configu file (JSON store)
+      copy:
+        dest: "{{ workspace_dir }}/configu-exercises/.configu"
+        content: |
+          {
+            "stores": [
+              {
+                "type": "json-file",
+                "configuration": {
+                  "path": "./stores/development.json"
+                }
+              }
+            ]
+          }
+        owner: vagrant
+        group: vagrant
+        mode: '0644'
+        
+    - name: Install jq (for JSON processing in exercises)
+      dnf:
+        name: jq
+        state: present
+        
+    - name: Create completion message
+      debug:
+        msg:
+          - "✅ Configu CLI installed successfully!"
+          - "📁 Exercises located at: {{ workspace_dir }}/configu-exercises"
+          - "🚀 Start with: cd ~/workspace/configu-exercises"
+          - "📖 Read README.md for instructions"
